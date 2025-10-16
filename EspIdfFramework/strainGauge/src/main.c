@@ -5,24 +5,13 @@
 
 
 
-#define RSTX 14
-#define RSRX 15
+#define RSTX 34
+#define RSRX 35
 
 void app_main() {
 
-const uart_port_t RS485 = UART_NUM_2;
-uart_config_t uart_config = {
-    .baud_rate = 115200,
-    .data_bits = UART_DATA_8_BITS,
-    .parity = UART_PARITY_DISABLE,
-    .stop_bits = UART_STOP_BITS_1,
-    .flow_ctrl = UART_HW_FLOWCTRL_CTS_RTS,
-    .rx_flow_ctrl_thresh = 122,
-};
-// Configure UART parameters
-uart_param_config(RS485, &uart_config);
-uart_set_pin(RS485, RSTX, RSRX, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
-HX711_t *leftForkSensor=HX711_init(RS485,1);
+
+HX711_t *leftForkSensor=HX711_init(UART_NUM_1,RSRX,RSTX,115200,1);
 
 
 
@@ -32,6 +21,8 @@ while (true){
 HX711_updateWeight(leftForkSensor,20);
 ESP_LOGI("MAIN", "Current Force: %d", leftForkSensor->Weight);
 vTaskDelay(pdMS_TO_TICKS(50));
+
+}
 
 }
 
@@ -58,4 +49,3 @@ uart_flush(RS485);
 */
 
 
-}

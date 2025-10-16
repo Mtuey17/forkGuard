@@ -19,6 +19,7 @@ i2c_master_bus_handle_t bus_handle;
 i2c_new_master_bus(&I2C_0_CONFIG, &bus_handle);
 
 
+
 /*
 i2c_device_config_t IMU_CONFIG = {
     .dev_addr_length = I2C_ADDR_BIT_LEN_7,
