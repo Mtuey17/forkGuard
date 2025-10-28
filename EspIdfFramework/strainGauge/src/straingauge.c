@@ -14,8 +14,7 @@ HX711_t *HX711_init(uart_port_t uart_num, uint8_t Rx,uint8_t Tx, uint32_t baudRa
         .data_bits = UART_DATA_8_BITS,
         .parity = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
-        .flow_ctrl = UART_HW_FLOWCTRL_CTS_RTS,
-        .rx_flow_ctrl_thresh = 122,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
     };
     // Configure UART parameters
     uart_param_config(RS485, &uart_config);
@@ -36,19 +35,16 @@ HX711_t *HX711_init(uart_port_t uart_num, uint8_t Rx,uint8_t Tx, uint32_t baudRa
 
 long HX711_updateWeight(HX711_t *hx, uint16_t timeout_ms){
 
-    //uart_flush(hx->uart_num);
+    uart_flush(hx->uart_num);
     //uart_flush_input(hx->uart_num);
 
-    uint8_t toSend[]={ hx->deviceID, 0x03, 0x00, 0x00, 0x00, 0x03 };
+    uint8_t toSend[8]={ hx->deviceID, 0x03, 0x00, 0x00, 0x00, 0x03};//0x05,0xCB
     int crc=HX711_crc16(toSend,6);
-    int toSendCRC[2] = { (uint8_t)(crc & 0xFF), (uint8_t)(crc >> 8) };
+    toSend[6]=(uint8_t)(crc & 0xFF);
+    toSend[7]=(uint8_t)(crc >> 8);
+    uart_write_bytes(hx->uart_num, (const char*)toSend,8);
 
-    uart_write_bytes(hx->uart_num, (const char*)toSend,6);
-    uart_write_bytes(hx->uart_num, (const char*)toSendCRC,2);
-
-    
-    vTaskDelay(pdMS_TO_TICKS(5));
-
+    vTaskDelay(pdMS_TO_TICKS(2));
     int startTime=esp_timer_get_time()/1000;
     int incomingDataLength=0;
     while (incomingDataLength<9){
@@ -60,14 +56,17 @@ long HX711_updateWeight(HX711_t *hx, uint16_t timeout_ms){
         }
     }
     
-    int deviceResponse[11];
+    uint8_t deviceResponse[11];
     int bytesToRead=11;
     uart_read_bytes(hx->uart_num, deviceResponse, bytesToRead,portMAX_DELAY);
-    
     int data=((int32_t)deviceResponse[3] << 24) |
                 ((int32_t)deviceResponse[4] << 16) |
                 ((int32_t)deviceResponse[5] << 8)  |
                 (int32_t)deviceResponse[6];
+
+    if (data & 0x800000) {//if negative
+        data |= 0xFF000000;
+    }
     if (!hx->offsetCheck){
         hx->offset=data;
         hx->offsetCheck=true;
@@ -80,7 +79,6 @@ long HX711_updateWeight(HX711_t *hx, uint16_t timeout_ms){
 }
 
 uint16_t HX711_crc16(uint8_t *data, uint8_t len){
-
     int crc=0xFFFF;
     for (int i=0;i<len;i++){
         crc^=data[i];

@@ -2,26 +2,29 @@
 #include "driver/uart.h"
 #include <string.h>
 #include "esp_log.h"
-
-
-
-#define RSTX 34
-#define RSRX 35
+#include "esp_timer.h"
+#include <stdio.h>
+#define RSTX 23
+#define RSRX 22
 
 void app_main() {
 
 
-HX711_t *leftForkSensor=HX711_init(UART_NUM_1,RSRX,RSTX,115200,1);
-
-
-
+HX711_t *leftForkSensor=HX711_init(UART_NUM_2,RSRX,RSTX,115200,1);
 
 while (true){
+int64_t start_time = esp_timer_get_time(); 
 
-HX711_updateWeight(leftForkSensor,20);
-ESP_LOGI("MAIN", "Current Force: %d", leftForkSensor->Weight);
-vTaskDelay(pdMS_TO_TICKS(50));
+    HX711_updateWeight(leftForkSensor, 10);
+    ESP_LOGI("MAIN", "Left Force: %d", leftForkSensor->Weight);
 
+
+    
+    int64_t end_time = esp_timer_get_time();   
+    int64_t compute_time_us = end_time - start_time;
+    float compute_time_ms = compute_time_us / 1000.0; // Convert to milliseconds
+    ESP_LOGI("MAIN", "Loop compute time: %.3f ms", compute_time_ms);
+    vTaskDelay(pdMS_TO_TICKS(20));
 }
 
 }

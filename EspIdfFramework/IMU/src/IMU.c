@@ -1,59 +1,117 @@
+/* Matthew Tuer 
+october 10th, 2025
+mtuer3727@conestogac.on.ca
+matthewjtuer@gmail.com 
+c file for BNO055 IMU
+*/
+
+
 #include "IMU.h"
 #include "driver/i2c_master.h"  
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_log.h"
 
 
 IMU_t *initializeIMU(i2c_master_bus_handle_t bus_handle, uint8_t id){
 
+    //i2c setup 
     i2c_device_config_t IMU_CONFIG = {
     .dev_addr_length = I2C_ADDR_BIT_LEN_7,
     .device_address = id,
-    .scl_speed_hz = 100000,
+    .scl_speed_hz = 400000,
     };
     i2c_master_dev_handle_t dev_handle;
     i2c_master_bus_add_device(bus_handle, &IMU_CONFIG, &dev_handle);
     IMU_t *imu_instance = malloc(sizeof(IMU_t));
     imu_instance->dev_handle=dev_handle;
     imu_instance->deviceID=id;
-    imu_instance->xAngle=0;
-    imu_instance->yAngle=0;
-    imu_instance->zAngle=0;
+    imu_instance->heading=0;
+    imu_instance->roll=0;
+    imu_instance->pitch=0;
+    imu_instance->acceleration=0;
 
 
 
-    //if read size 0, automatically a write
-    uint8_t configMode[2] = {0x3D, 0x00}; //3D OPR_MODE, 0x00=config mode 
-    i2c_master_transmit_receive(imu_instance->dev_handle, configMode, 2, NULL, 0, -1);//handler, data to send, data length, read variable, read length, timeout
+    // 1. CONFIGMODE
+    vTaskDelay(pdMS_TO_TICKS(1000));
+        uint8_t configMode[2] = {0x3D, 0x00};
+        i2c_master_transmit(dev_handle, configMode, 2, pdMS_TO_TICKS(50));
+        vTaskDelay(pdMS_TO_TICKS(50));
 
-    uint8_t pwrMode[2] = {0x3E, 0x00}; // 0x3E = PWR_MODE register, 0x00 = Normal power mode
-    i2c_master_transmit_receive(imu_instance->dev_handle, pwrMode, 2, NULL, 0, -1);//handler, data to send, data length, read variable, read length, timeout
+        // 2. Power mode
+        uint8_t pwrMode[2] = {0x3E, 0x00};
+        i2c_master_transmit(dev_handle, pwrMode, 2, pdMS_TO_TICKS(50));
+        vTaskDelay(pdMS_TO_TICKS(50));
 
-    uint8_t buf[2] = {0x3D, 0x03};  // 0x3D = OPR_MODE register, 0x03 = gyroonly
-    i2c_master_transmit_receive(imu_instance->dev_handle, buf, 2, NULL, 0, -1);//handler, data to send, data length, read variable, read length, timeout
+        // 3. Units (Euler angles in degrees, accel in m/s^2)
+        uint8_t units[2] = {0x3B, 0x00};
+        i2c_master_transmit(dev_handle, units, 2, pdMS_TO_TICKS(50));
+        vTaskDelay(pdMS_TO_TICKS(50));
+
+        // 4. Operation mode: NDOF
+        uint8_t opMode[2] = {0x3D, 0x0C};
+        i2c_master_transmit(dev_handle, opMode, 2, pdMS_TO_TICKS(50));
+        vTaskDelay(pdMS_TO_TICKS(500)); // wait for fusion to stabilize
+
+
 
     return imu_instance;
 }
 
-void updateAngles(IMU_t *IMU){
-    uint8_t responseLSB[1];
-    uint8_t responseMSB[1];
 
-    uint8_t xLSB[1]={0x14};
-    uint8_t xMSB[1]={0x15};
+bool IMUInfo(IMU_t*IMU){
+
+    
+
+    ESP_LOGI("Info", "**IMU INFO**");
+
+    //chip id
+    uint8_t reg = 0x00;
+    uint8_t id2 = 0;
+    i2c_master_transmit_receive(IMU->dev_handle, &reg, 1, &id2, 1, -1);
+    ESP_LOGI("Info", "Chip ID: 0x%02X", id2);
+
+    //mode
+    reg = 0x3D;
+    uint8_t mode2 = 0;
+    i2c_master_transmit_receive(IMU->dev_handle, &reg, 1, &mode2, 1, -1);
+    ESP_LOGI("Info", "OPR_MODE = 0x%02X", mode2);
+
+
+    ESP_LOGI("Info", "-----------");
+    return true;
+
+}
+bool updateAngles(IMU_t *IMU){
+
+    uint8_t response[2];
+
     //master handle, to send, size of to send, read size(bytes) timeout (-1=none)
-    i2c_master_transmit_receive(IMU->dev_handle, xLSB, sizeof(xLSB), responseLSB, 1, -1);
-    i2c_master_transmit_receive(IMU->dev_handle, xMSB, sizeof(xMSB), responseMSB, 1, -1);
-    IMU->xAngle=(int16_t)((responseMSB[0]<<8)|responseLSB[0]);
+    uint8_t eulerX[2]={0x1A,0x1B};
+    i2c_master_transmit_receive(IMU->dev_handle, eulerX, sizeof(eulerX), response, 2, -1);
+    IMU->heading = ((int16_t)((response[1] << 8) | response[0])) / 16;
 
-    uint8_t yLSB[1]={0x16};
-    uint8_t yMSB[1]={0x17};
-    i2c_master_transmit_receive(IMU->dev_handle, yLSB, sizeof(yLSB), responseLSB, 1, -1);
-    i2c_master_transmit_receive(IMU->dev_handle, yMSB, sizeof(yMSB), responseMSB, 1, -1);
-    IMU->yAngle=(int16_t)((responseMSB[0]<<8)|responseLSB[0]);
+    uint8_t eulerY[2]={0x1C,0x1D};
+    i2c_master_transmit_receive(IMU->dev_handle, eulerY, sizeof(eulerY), response, 2, -1);
+    IMU->roll=((int16_t)((response[1] << 8) | response[0])) / 16;
+ 
+    uint8_t eulerZ[2]={0x1E,0x1F};
+    i2c_master_transmit_receive(IMU->dev_handle, eulerZ, sizeof(eulerZ), response, 2, -1);
+    IMU->pitch=((int16_t)((response[1] << 8) | response[0])) / 16;
+    return true;
 
-    uint8_t zLSB[1]={0x18};
-    uint8_t zMSB[1]={0x19};
-    i2c_master_transmit_receive(IMU->dev_handle, zLSB, sizeof(zLSB), responseLSB, 1, -1);
-    i2c_master_transmit_receive(IMU->dev_handle, zMSB, sizeof(zMSB), responseMSB, 1, -1);
-    IMU->zAngle=(int16_t)((responseMSB[0]<<8)|responseLSB[0]);
+}
+
+
+bool updateAcceleration(IMU_t* IMU){
+
+    //master handle, to send, size of to send, read size(bytes) timeout (-1=none)
+    uint8_t response[2];
+    uint8_t accelY[2]={0x0A,0x0B};
+    i2c_master_transmit_receive(IMU->dev_handle, accelY, sizeof(accelY), response, 2, -1);
+    int16_t raw_acc = (int16_t)((response[1] << 8) | response[0]);
+    IMU->acceleration = (float)raw_acc / 100.0f;
+    return true;
 
 }

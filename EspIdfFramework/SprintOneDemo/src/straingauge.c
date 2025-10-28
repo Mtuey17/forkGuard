@@ -1,3 +1,10 @@
+/* Matthew Tuer 
+october 5th, 2025
+mtuer3727@conestogac.on.ca
+matthewjtuer@gmail.com 
+c file for hx711 load amp
+*/
+
 #include "straingauge.h"
 #include "driver/uart.h"
 #include "esp_timer.h"
@@ -36,21 +43,27 @@ HX711_t *HX711_init(uart_port_t uart_num, uint8_t Rx,uint8_t Tx, uint32_t baudRa
 
 long HX711_updateWeight(HX711_t *hx, uint16_t timeout_ms){
 
-    //uart_flush(hx->uart_num);
+    uart_flush(hx->uart_num);
     //uart_flush_input(hx->uart_num);
 
-    uint8_t toSend[]={ hx->deviceID, 0x03, 0x00, 0x00, 0x00, 0x03 };
-    int crc=HX711_crc16(toSend,6);
-    int toSendCRC[2] = { (uint8_t)(crc & 0xFF), (uint8_t)(crc >> 8) };
 
+
+    //creating toSend message
+    uint8_t toSend[]={ hx->deviceID, 0x03, 0x00, 0x00, 0x00, 0x03 };
+    int crc=HX711_crc16(toSend,6);//modbus crc16 data validation
+    int toSendCRC[2] = { (uint8_t)(crc & 0xFF), (uint8_t)(crc >> 8) };//adding crc to array
+
+
+    //sending data
     uart_write_bytes(hx->uart_num, (const char*)toSend,6);
     uart_write_bytes(hx->uart_num, (const char*)toSendCRC,2);
 
-    
+    //small delay
     vTaskDelay(pdMS_TO_TICKS(5));
 
     int startTime=esp_timer_get_time()/1000;
     int incomingDataLength=0;
+    //waiting for response, with timeout 
     while (incomingDataLength<9){
         uart_get_buffered_data_len(hx->uart_num, (size_t*)&incomingDataLength);
         int currentTime=esp_timer_get_time()/1000;
@@ -63,18 +76,19 @@ long HX711_updateWeight(HX711_t *hx, uint16_t timeout_ms){
     int deviceResponse[11];
     int bytesToRead=11;
     uart_read_bytes(hx->uart_num, deviceResponse, bytesToRead,portMAX_DELAY);
-    
+    //getting data from device 
     int data=((int32_t)deviceResponse[3] << 24) |
                 ((int32_t)deviceResponse[4] << 16) |
                 ((int32_t)deviceResponse[5] << 8)  |
                 (int32_t)deviceResponse[6];
-    if (!hx->offsetCheck){
+    if (!hx->offsetCheck){//setting offset if first time data is being read 
         hx->offset=data;
         hx->offsetCheck=true;
         hx->Weight=0;
         return hx->Weight;
     }
     data-=hx->offset;
+    //setting weight and returning it.
     hx->Weight=data;
     return hx->Weight;
 }

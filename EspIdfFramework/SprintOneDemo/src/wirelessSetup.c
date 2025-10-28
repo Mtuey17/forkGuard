@@ -16,6 +16,8 @@ c file for wireless communication functions
 
 
 void initWifi(char *SSID,char *Password){
+
+    //need nvs for wifi 
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
@@ -39,8 +41,10 @@ void initWifi(char *SSID,char *Password){
 
 esp_mqtt_client_handle_t initMQTT(){
 
+
+    //connecting to mqtt server 
      const esp_mqtt_client_config_t mqtt_cfg = {
-    .broker.address.uri= "mqtt://192.168.8.210:1883",
+    .broker.address.uri= "mqtt://192.168.8.210:1883",//server laptop at 192.168.0.210, port 1883
 };
 esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
 esp_mqtt_client_start(client);
