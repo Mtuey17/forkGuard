@@ -1,6 +1,8 @@
 #include "driver/i2c_master.h"
-#include "IMU.h"
+#include "VL53L.h"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 #define SDAPIN 14
 #define SCLPIN 12
@@ -21,15 +23,20 @@ i2c_new_master_bus(&I2C_0_CONFIG, &bus_handle);
 
 
     //page 60 of datasheet for id, maybe 28 0r 29
-    IMU_t *IMU=initializeIMU(bus_handle,0x29);
+    VL53L_t *TOF=initializeTOF(bus_handle,0x29);
 
 
     while(1){
 
-        updateAngles(IMU);
-        updateAcceleration(IMU);
+        updateDistance(TOF);
+        ESP_LOGI("TOF", "id: %d", TOF->validID);
+        ESP_LOGI("TOF", "Distance: %d cm", TOF->distance);
+        vTaskDelay(pdMS_TO_TICKS(100));
+
+
+        
  
-        ESP_LOGI("main","roll:%d|pitch:%d|accel:%f",IMU->roll,IMU->pitch,IMU->forwardAcceleration);
+        
         
     }
 

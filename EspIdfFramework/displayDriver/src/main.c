@@ -22,7 +22,7 @@ void i2c0_ssd1306_task( void *pvParameters ) {
     TickType_t          last_wake_time   = xTaskGetTickCount ();
     //
     // initialize i2c device configuration
-    ssd1306_config_t dev_cfg         = I2C_SSD1306_128x64_CONFIG_DEFAULT;
+    ssd1306_config_t dev_cfg         = I2C_SSD1306_128x32_CONFIG_DEFAULT;
     ssd1306_handle_t dev_hdl;
     //
     // init device
@@ -157,8 +157,8 @@ void app_main() {
     i2c_master_bus_config_t i2c_conf = {
         .clk_source = I2C_CLK_SRC_DEFAULT,
     .i2c_port = I2C_NUM_0,
-    .scl_io_num = 13,
-    .sda_io_num = 12,
+    .scl_io_num = 18,
+    .sda_io_num = 19,
     .glitch_ignore_cnt = 7,
     .flags.enable_internal_pullup = true,
     };

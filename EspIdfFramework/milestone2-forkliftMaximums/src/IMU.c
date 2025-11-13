@@ -37,24 +37,24 @@ IMU_t *initializeIMU(i2c_master_bus_handle_t bus_handle, uint8_t id){
 
 
     // 1. CONFIGMODE
-    vTaskDelay(pdMS_TO_TICKS(1000));
+    vTaskDelay(pdMS_TO_TICKS(2500));
         uint8_t configMode[2] = {0x3D, 0x00};
-        i2c_master_transmit(dev_handle, configMode, 2, pdMS_TO_TICKS(50));
+        i2c_master_transmit(dev_handle, configMode, 2, pdMS_TO_TICKS(150));
         vTaskDelay(pdMS_TO_TICKS(50));
 
         // 2. Power mode
         uint8_t pwrMode[2] = {0x3E, 0x00};
-        i2c_master_transmit(dev_handle, pwrMode, 2, pdMS_TO_TICKS(50));
+        i2c_master_transmit(dev_handle, pwrMode, 2, pdMS_TO_TICKS(150));
         vTaskDelay(pdMS_TO_TICKS(50));
 
         // 3. Units (Euler angles in degrees, accel in m/s^2)
         uint8_t units[2] = {0x3B, 0x00};
-        i2c_master_transmit(dev_handle, units, 2, pdMS_TO_TICKS(50));
+        i2c_master_transmit(dev_handle, units, 2, pdMS_TO_TICKS(150));
         vTaskDelay(pdMS_TO_TICKS(50));
 
         // 4. Operation mode: NDOF
         uint8_t opMode[2] = {0x3D, 0x0C};
-        i2c_master_transmit(dev_handle, opMode, 2, pdMS_TO_TICKS(50));
+        i2c_master_transmit(dev_handle, opMode, 2, pdMS_TO_TICKS(150));
         vTaskDelay(pdMS_TO_TICKS(500)); // wait for fusion to stabilize
 
 

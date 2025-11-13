@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Forklift Driver Dashboard</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+</head>
+<body class="bg-gray-100 min-h-screen p-6">
+  <div class="max-w-5xl mx-auto">
+    <h1 class="text-3xl font-bold text-gray-800 mb-6">Forklift Driver Dashboard</h1>
+
+    <!-- Driver List -->
+    <div id="driverList" class="space-y-4">
+      <!-- Example driver cards will be injected here -->
+    </div>
+  </div>
+
+  <script>
+    class Driver {
+        constructor(name, id, Sscore, incidents, SscoreOverTime) {
+            this.name = name;
+            this.id = id;
+            this.incidents = incidents;
+            this.safetyScore = Sscore;
+            this.scoreOverTime = SscoreOverTime;
+        }
+        }
+
+     const drivers = [
+    new Driver("John Smith", "D001", 88, 1, [80, 85, 90, 95, 87, 88, 92]),
+    new Driver("Sarah Johnson", "D002", 92, 0, [88, 91, 89, 94, 96, 90, 92]),
+    new Driver("Michael Lee", "D003", 76, 2, [70, 75, 78, 80, 74, 76, 79]),
+    new Driver("Jamal Burray", "D004", 59, 2, [70, 75, 78, 80, 74, 76, 79])
+  ];
+
+    const driverList = document.getElementById("driverList");
+
+    drivers.forEach((driver, index) => {
+      const card = document.createElement("div");
+      card.className =
+        "driver-card bg-white p-4 rounded-xl shadow cursor-pointer";
+
+      card.innerHTML = `
+        <div class="flex justify-between items-center">
+          <div>
+            <h2 class="text-xl font-semibold text-gray-800">${driver.name}</h2>
+            <p class="text-sm text-gray-500">ID: ${driver.id}</p>
+          </div>
+          <span class="text-gray-600">▼</span>
+        </div>
+
+        <div id="details-${index}" class="hidden mt-4 border-t pt-4">
+          <div class="grid grid-cols-3 gap-4 mb-4">
+            <div class="bg-gray-50 p-3 rounded-lg text-center">
+              <p class="text-sm text-gray-500">Safety Score</p>
+              <p class="text-xl font-bold text-green-600">${driver.safetyScore}%</p>
+            </div>
+            <div class="bg-gray-50 p-3 rounded-lg text-center">
+              <p class="text-sm text-gray-500">Incidents</p>
+              <p class="text-xl font-bold text-blue-600">${driver.incidents}</p>
+            </div>
+           
+          </div>
+          <canvas id="chart-${index}" height="100"></canvas>
+        </div>
+      `;
+
+      card.addEventListener("click", () => {
+        const details = document.getElementById(`details-${index}`);
+        const icon = card.querySelector("span");
+        const isHidden = details.classList.contains("hidden");
+
+        document.querySelectorAll("[id^='details-']").forEach((d) => d.classList.add("hidden"));
+        document.querySelectorAll(".driver-card span").forEach((i) => (i.textContent = "▼"));
+
+        if (isHidden) {
+          details.classList.remove("hidden");
+          icon.textContent = "▲";
+          renderChart(`chart-${index}`, driver.scoreOverTime);
+        }
+      });
+
+      driverList.appendChild(card);
+    });
+
+    function renderChart(canvasId, data) {
+      const ctx = document.getElementById(canvasId).getContext("2d");
+      if (Chart.getChart(ctx)) Chart.getChart(ctx).destroy();
+
+      new Chart(ctx, {
+        type: "line",
+        data: {
+          labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+          datasets: [
+            {
+              label: "Safety Score over time",
+              data,
+              borderColor: "#2563EB",
+              borderWidth: 2,
+              fill: false,
+              tension: 0.3
+            }
+          ]
+        },
+        options: {
+          scales: {
+            y: { beginAtZero: true, max: 100 }
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>
