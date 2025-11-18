@@ -5,7 +5,7 @@
 #include "esp_log.h"
 
 
-HX711_t *HX711_init(uart_port_t uart_num, uint8_t Rx,uint8_t Tx, uint32_t baudRate,uint8_t id){
+HX711_t *HX711_init(uart_port_t uart_num, uint8_t Rx,uint8_t Tx, uint32_t baudRate,uint8_t id, float wToGRatio){
 
 
     const uart_port_t RS485 = uart_num;
@@ -29,6 +29,8 @@ HX711_t *HX711_init(uart_port_t uart_num, uint8_t Rx,uint8_t Tx, uint32_t baudRa
     hx_instance->requestCRC[1] = 0;
     hx_instance->offset = 0;
     hx_instance->offsetCheck = false;
+    hx_instance->kgWeight=0;
+    hx_instance->ratio=wToGRatio;
     return hx_instance;
 
 }
@@ -75,6 +77,8 @@ long HX711_updateWeight(HX711_t *hx, uint16_t timeout_ms){
     }
     data-=hx->offset;
     hx->Weight=data;
+    hx->kgWeight=((float)data*hx->ratio)/1000;
+
     return hx->Weight;
 }
 

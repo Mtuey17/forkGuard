@@ -37,7 +37,7 @@ IMU_t *initializeIMU(i2c_master_bus_handle_t bus_handle, uint8_t id){
 
 
     // 1. CONFIGMODE
-    vTaskDelay(pdMS_TO_TICKS(2500));
+    vTaskDelay(pdMS_TO_TICKS(300));
         uint8_t configMode[2] = {0x3D, 0x00};
         i2c_master_transmit(dev_handle, configMode, 2, pdMS_TO_TICKS(150));
         vTaskDelay(pdMS_TO_TICKS(50));
