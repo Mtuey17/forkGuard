@@ -65,8 +65,8 @@ i2c_new_master_bus(&I2C_1_CONFIG, &bus_handle2);
     //Strain Amp setup
     #define RSTX 36
     #define RSRX 38
-    HX711_t *leftForkSensor=HX711_init(UART_NUM_2,RSRX,RSTX,115200,2,1.29);
-    HX711_t *rightForkSensor=HX711_init(UART_NUM_2,RSRX,RSTX,115200,1,1.29);
+    HX711_t *leftForkSensor=HX711_init(UART_NUM_2,RSRX,RSTX,115200,2,1.44);
+    HX711_t *rightForkSensor=HX711_init(UART_NUM_2,RSRX,RSTX,115200,1,1.0824);
     bool flipStrainRead=false;
 
 
@@ -91,12 +91,12 @@ i2c_new_master_bus(&I2C_1_CONFIG, &bus_handle2);
         //updateDistance(TOF);
         vTaskDelay(pdMS_TO_TICKS(10));
         updateAngles(IMU);
-        calculateDynamicLoad(toyLift,IMU->pitch,9.5);
+        calculateDynamicLoad(toyLift,IMU->pitch,11.5);
         
  
         //ESP_LOGI("main","leftW: %d|rightW: %d",leftForkSensor->Weight,rightForkSensor->Weight);
 
-
+        ESP_LOGI("main","raw: %d",rightForkSensor->Weight);
         ESP_LOGI("main","pitch: %d | maxLoad: %f kg| currentLoad: %f kg",IMU->pitch,toyLift->maxDynamicLoad,rightForkSensor->kgWeight*-2);
         vTaskDelay(pdMS_TO_TICKS(50));
 
@@ -112,8 +112,18 @@ i2c_new_master_bus(&I2C_1_CONFIG, &bus_handle2);
         ssd1306_display_text_x2(OLED, 2, toDisplay2, false);
      
 
+        int safetyScore=100;
+        float threshold75 = toyLift->maxDynamicLoad * 0.85f;
+
+        if (fabsf(rightForkSensor->kgWeight*-2.0f) > threshold75) {
+            float span =  toyLift->maxDynamicLoad - threshold75;   // This is 25% of max
+        float excess = fabsf(rightForkSensor->kgWeight*-2.0f)  - threshold75;
+        // Linear drop from 100 → 0
+        float fraction = excess / span;  
+        safetyScore = (int)(100.0f * (1.0f - fraction));
+        }
         char msg[128];
-        snprintf(msg, sizeof(msg), "Driver:Matt,MaxWeight:%0.3f,CurrentWeight:%0.3f,Pitch:%d,:LoadHeight:%d", toyLift->maxDynamicLoad,fabsf(rightForkSensor->kgWeight*-2.0f),IMU->pitch,10);
+        snprintf(msg, sizeof(msg), "Driver:Matt,MaxWeight:%0.3f,CurrentWeight:%0.3f,Pitch:%d,LoadHeight:%d,score:%d", toyLift->maxDynamicLoad,fabsf(rightForkSensor->kgWeight*-2.0f),IMU->pitch,10,safetyScore);
         esp_mqtt_client_publish(mqttClient, "toyLift1/sensors", msg, 0, 1, 0);
         oledCount=0;
         }
