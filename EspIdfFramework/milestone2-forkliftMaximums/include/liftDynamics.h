@@ -1,8 +1,7 @@
 /* Matthew Tuer 
-october 10th, 2025
+november 10th, 2025
 mtuer3727@conestogac.on.ca
 matthewjtuer@gmail.com 
-Header file for BNO055 IMU
 */
 #ifndef LIFTDYNAMICS_H
 #define LIFTDYNAMICS_H

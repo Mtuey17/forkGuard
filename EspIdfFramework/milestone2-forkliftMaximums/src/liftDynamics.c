@@ -1,3 +1,9 @@
+/* Matthew Tuer 
+november 10th, 2025
+mtuer3727@conestogac.on.ca
+matthewjtuer@gmail.com 
+*/
+
 #include "liftDynamics.h"
 #include "freertos/FreeRTOS.h"
 #include <stdint.h>

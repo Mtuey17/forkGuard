@@ -1,4 +1,8 @@
-/* Matthew Tuer, July 30, 2025 mtuer@uwaterloo.ca/matthewjtuer@gmail.com */
+/* Matthew Tuer 
+october 15th, 2025
+mtuer3727@conestogac.on.ca
+matthewjtuer@gmail.com 
+*/
 
 #ifndef STRAINGAUGE_H
 #define STRAINGAUGE_H
