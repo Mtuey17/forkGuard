@@ -11,8 +11,8 @@ matthewjtuer@gmail.com
 ForkLift* initializeLift(){
     ForkLift *lift_instance = malloc(sizeof(ForkLift));
     lift_instance->wheelBase=14.5;
-    lift_instance->weightKG=1.469; //=0.766;
-    lift_instance->cOfG=10;
+    lift_instance->weightKG=1.360; //=0.766;
+    lift_instance->cOfG=9.5;
     lift_instance->FwToLoad=10;
     lift_instance->maxDynamicLoad=0;
     lift_instance->maxFlatLoad= (float)(lift_instance->weightKG*( (lift_instance->wheelBase-lift_instance->cOfG)/lift_instance->FwToLoad));
