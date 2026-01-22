@@ -8,6 +8,7 @@ matthewjtuer@gmail.com
 #include "freertos/FreeRTOS.h"
 #include <stdint.h>
 #include <math.h>
+#include <string.h>
 ForkLift* initializeLift(){
     ForkLift *lift_instance = malloc(sizeof(ForkLift));
     lift_instance->wheelBase=14.5;
@@ -20,6 +21,13 @@ ForkLift* initializeLift(){
     lift_instance->safetyFactor=.8f;
     lift_instance->loadScore=100.0f;
     lift_instance->brakeScore=100.0f;
+    lift_instance-> currentLoad=0;
+    lift_instance-> currentAccel=0;
+    lift_instance-> gas=0;
+    lift_instance-> noise=0;
+    memset(lift_instance->currentDriver, 0, sizeof(lift_instance->currentDriver));
+    memset(lift_instance->previousDriver, 0, sizeof(lift_instance->previousDriver));
+
     
     lift_instance->maxFlatLoad= (float)(lift_instance->weightKG*( (lift_instance->wheelBase-lift_instance->cOfG)/lift_instance->FwToLoad));
     return lift_instance; 

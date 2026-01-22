@@ -74,7 +74,7 @@ void drawWeightChart(ssd1306_handle_t OLED,float currentWeight,float maxCurrentW
     const uint8_t maxHeight = 32;
 
     float maxWidth = 120.0f * fminf(maxCurrentWeight / matFlatWeight, 1.0f);
-    float safeX    = maxWidth * 0.75f;
+    float safeX    = maxWidth * 0.80f;
 
     float pct = currentWeight / maxCurrentWeight;
     pct = fminf(pct, 1.0f);

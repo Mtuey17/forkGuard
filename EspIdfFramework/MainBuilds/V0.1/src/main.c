@@ -38,8 +38,8 @@ void app_main() {
 
 #define WIFI_SSID "ForkGuardNet"
 #define WIFI_PASS "Guard1234"
-//initWifi(WIFI_SSID,WIFI_PASS);
-//MQTTHandler* MQTT=initMQTT();
+initWifi(WIFI_SSID,WIFI_PASS);
+MQTTHandler* MQTT=initMQTT();
 
 
 
@@ -87,7 +87,7 @@ i2c_new_master_bus(&I2C_1_CONFIG, &bus_handle2);
     HX711_t *leftForkSensor=HX711_init(UART_NUM_2,RSRX,RSTX,115200,2,2.29);//1.74626
     HX711_t *rightForkSensor=HX711_init(UART_NUM_2,RSRX,RSTX,115200,1,1.32);
     bool flipStrainRead=false;
-    bool sendToMQTT=false;
+
     
 
     //sensors have matching ids, two seperate i2c busses needed
@@ -101,7 +101,7 @@ i2c_new_master_bus(&I2C_1_CONFIG, &bus_handle2);
     
 
     char toDisplay[32];
-    snprintf(toDisplay, sizeof(toDisplay), "Test1234");
+    snprintf(toDisplay, sizeof(toDisplay), "F.G--M.T");
     ssd1306_display_text_x2(OLED, 0, toDisplay, false);
     ssd1306_display_text_x2(OLED, 2, toDisplay, false);
 
@@ -111,48 +111,50 @@ i2c_new_master_bus(&I2C_1_CONFIG, &bus_handle2);
     #define GAS_WARNING_LED GPIO_NUM_47
     gpio_set_direction(GAS_SENSOR_PIN,GPIO_MODE_INPUT);
     gpio_set_direction(GAS_WARNING_LED,GPIO_MODE_OUTPUT);
-    bool gasLevelOK;
+
+    gpio_set_direction(GPIO_NUM_48,GPIO_MODE_OUTPUT);
 
 
     //microphoneInit();
     mfrc522_init();
-    uint8_t uid[4] = {0};
-
-
     
     while(1){
 
 
-        mfrc522_read_uid(uid);
+        mfrc522_read_uid(toyLift->currentDriver);
+
         //flipping what strain gauge is being read every loop 
         if (flipStrainRead){HX711_updateWeight(leftForkSensor, 40);}
         else{HX711_updateWeight(rightForkSensor, 40);}
         flipStrainRead=!flipStrainRead;
        
 
-        //vTaskDelay(pdMS_TO_TICKS(10));
         updateDistance(TOF); 
         updateAngles(IMU);
+        toyLift->currentAccel=IMU->rawYAcceleration;
         updateAcceleration(IMU);
 
-        float currentWeight=(leftForkSensor->kgWeight*-1.0)*2.0;
-        if (currentWeight<0.0){
-            currentWeight=0.0;
+        toyLift->currentLoad=(leftForkSensor->kgWeight*-1.0)*2.0;
+        if (toyLift->currentLoad<0.0){
+            toyLift->currentLoad=0.0;
         }
+
         //checking advanced metrics 
        calculateDynamicLoad(toyLift,IMU->pitch,TOF->distance);//calculating max load at current pitch/load height
-       calculateMaxDeaccel(toyLift,currentWeight, TOF->distance, IMU->pitch);
-       calculateSafetyScores(toyLift,currentWeight,IMU->rawYAcceleration);
+       calculateMaxDeaccel(toyLift,toyLift->currentLoad, TOF->distance, IMU->pitch);
+       calculateSafetyScores(toyLift,toyLift->currentLoad,IMU->rawYAcceleration);
     
         //checking gas and noise levels 
-        gasLevelOK=gpio_get_level(GAS_SENSOR_PIN);
-        gpio_set_level(GAS_WARNING_LED,!gasLevelOK);
+        toyLift->gas=gpio_get_level(GAS_SENSOR_PIN);
+        gpio_set_level(GAS_WARNING_LED,!toyLift->gas);
 
-        drawWeightChart(OLED,currentWeight,toyLift->maxDynamicLoad);
+        drawWeightChart(OLED,toyLift->currentLoad,toyLift->maxDynamicLoad);
 
 
-        ESP_LOGI("main","maxAccel: %f | currentAccel: %f",toyLift->maxAcceleration,IMU->rawYAcceleration);
-        ESP_LOGI("main","pitch: %d | maxLoad: %f kg| currentLoad: %f kg| height: %dcm|GAS:%d|UID:%02X%02X%02X%02X",IMU->pitch,toyLift->maxDynamicLoad,currentWeight,TOF->distance,gasLevelOK,uid[0], uid[1], uid[2], uid[3]);
+        sendMQTT(MQTT,toyLift);
+
+        //ESP_LOGI("main","maxAccel: %f | currentAccel: %f",toyLift->maxAcceleration,toyLift->currentAccel);
+        //ESP_LOGI("main","pitch: %d | maxLoad: %f kg| currentLoad: %f kg| height: %dcm|GAS:%d|UID:%02X%02X%02X%02X",IMU->pitch,toyLift->maxDynamicLoad,toyLift->currentLoad,TOF->distance,gasLevelOK,toyLift->currentDriver[0], toyLift->currentDriver[1], toyLift->currentDriver[2], toyLift->currentDriver[3]);
 
         vTaskDelay(pdMS_TO_TICKS(40));
     }

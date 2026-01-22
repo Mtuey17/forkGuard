@@ -22,10 +22,18 @@ typedef struct {
     float wheelBase;
     float weightKG;
     float maxDynamicLoad;
+    float currentLoad;
     float maxAcceleration;
+    float currentAccel;
     float safetyFactor;
     float loadScore;
     float brakeScore; 
+
+    uint8_t currentDriver[4];
+    uint8_t previousDriver[4];
+
+    uint8_t gas;
+    uint8_t noise;
 
    
 } ForkLift;
