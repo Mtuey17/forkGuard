@@ -45,6 +45,8 @@ MQTT_INSTANCE->gasLatch=false;
 MQTT_INSTANCE->noiseLatch=false;
 MQTT_INSTANCE->weightLatch=false;
 MQTT_INSTANCE->UUIDLAtch=false;
+MQTT_INSTANCE->weightErrorLatch=false;
+MQTT_INSTANCE->brakeErrorLatch=false;
 MQTT_INSTANCE->handler=client;
 return MQTT_INSTANCE;
 
@@ -53,13 +55,47 @@ return MQTT_INSTANCE;
 bool sendMQTT(MQTTHandler* MQTT_INSTANCE,ForkLift* LiftValues){
     float safeMargine=LiftValues->safetyFactor;
 
+
+    
+    //--------------Handling brake warning and error messages--------------
+    //approaching max 
+    bool allowWeightWarning=true;
     //case when driver is operating within safety margine 
-    if (((LiftValues->currentLoad/LiftValues->maxDynamicLoad)>safeMargine)&&!MQTT_INSTANCE->weightLatch){
+    if (((LiftValues->currentAccel/LiftValues->maxAcceleration)>safeMargine)&&!MQTT_INSTANCE->brakeLatch){
+    MQTT_INSTANCE->brakeLatch=true;
+    char msg[128];
+        allowWeightWarning=false;
+        snprintf(msg, sizeof(msg), "approaching brake max!");
+        esp_mqtt_client_publish(MQTT_INSTANCE->handler, "toyLift1/brakeWarning", msg, 0, 2, 0);
+    }
+      if ((LiftValues->currentAccel/LiftValues->maxAcceleration)<safeMargine){
+    MQTT_INSTANCE->brakeLatch=false;
+    }
+    //exceding max 
+    if (LiftValues->currentAccel>LiftValues->maxAcceleration&&!MQTT_INSTANCE->brakeErrorLatch){
+        MQTT_INSTANCE->brakeErrorLatch=true;
+        char msg[128];
+
+        snprintf(msg, sizeof(msg), "Excedded brake max!");
+        esp_mqtt_client_publish(MQTT_INSTANCE->handler, "toyLift1/brakeError", msg, 0, 2, 0);
+    }
+     if (LiftValues->currentAccel<LiftValues->maxAcceleration){
+        MQTT_INSTANCE->brakeErrorLatch=false;
+     }
+     //-----------------------------------------------------------
+
+
+
+    //--------------Handling weight warning and error messages--------------
+    //when accelerating/deaccelerating hard weight reading may be incorrect. only allowed to send weight warning when not under steep accel
+    //case when driver is operating within safety margine
+    //apporaching max
+    if (((LiftValues->currentLoad/LiftValues->maxDynamicLoad)>safeMargine)&&!MQTT_INSTANCE->weightLatch&&allowWeightWarning){
     MQTT_INSTANCE->weightLatch=true;
     char msg[128];
 
         gpio_set_level(GPIO_NUM_48,1);
-        snprintf(msg, sizeof(msg), "test");
+        snprintf(msg, sizeof(msg), "Approaching_Weight_Max");
         esp_mqtt_client_publish(MQTT_INSTANCE->handler, "toyLift1/weightWarning", msg, 0, 2, 0);
 
     }
@@ -67,30 +103,49 @@ bool sendMQTT(MQTTHandler* MQTT_INSTANCE,ForkLift* LiftValues){
     MQTT_INSTANCE->weightLatch=false;
     gpio_set_level(GPIO_NUM_48,0);
     }
+    //exceeding max 
+    if (LiftValues->currentLoad>LiftValues->maxDynamicLoad&&!MQTT_INSTANCE->weightErrorLatch){
+        MQTT_INSTANCE->weightErrorLatch=true;
+        char msg[128];
 
-    //case when driver is operating within safety margine 
-    if (((LiftValues->currentAccel/LiftValues->maxAcceleration)>safeMargine)&&!MQTT_INSTANCE->brakeLatch){
-    MQTT_INSTANCE->brakeLatch=true;
-    char msg[128];
-
-        snprintf(msg, sizeof(msg), "tes2t");
-        esp_mqtt_client_publish(MQTT_INSTANCE->handler, "toyLift1/brakeWarning", msg, 0, 2, 0);
-
+        snprintf(msg, sizeof(msg), "Excedded_Weight_Max");
+        esp_mqtt_client_publish(MQTT_INSTANCE->handler, "toyLift1/weightError", msg, 0, 2, 0);
     }
-    if ((LiftValues->currentAccel/LiftValues->maxAcceleration)<safeMargine){
-    MQTT_INSTANCE->brakeLatch=false;
-    }
+     if (LiftValues->currentLoad<LiftValues->maxDynamicLoad&&allowWeightWarning){
+        MQTT_INSTANCE->weightErrorLatch=false;
+     }
+     //-----------------------------------------------------------------------
 
+
+
+    //----------------------gas message-----------------------------------
     if (!LiftValues->gas&& !MQTT_INSTANCE->gasLatch){
         MQTT_INSTANCE->gasLatch=true;
         char msg[128];
-        snprintf(msg, sizeof(msg), "test3");
+        snprintf(msg, sizeof(msg), "Gas_Level_High");
         esp_mqtt_client_publish(MQTT_INSTANCE->handler, "toyLift1/gas", msg, 0, 2, 0);
     }
     if (LiftValues->gas){
         MQTT_INSTANCE->gasLatch=false;
     }
+    //--------------------------------------------------------------------
 
+    //----------------------gas message-----------------------------------
+    if (LiftValues->noise&& !MQTT_INSTANCE->noiseLatch){
+        MQTT_INSTANCE->noiseLatch=true;
+        char msg[128];
+        snprintf(msg, sizeof(msg), "Noise_Level_High");
+        esp_mqtt_client_publish(MQTT_INSTANCE->handler, "toyLift1/noise", msg, 0, 2, 0);
+    }
+    if (!LiftValues->noise){
+        MQTT_INSTANCE->noiseLatch=false;
+    }
+    //--------------------------------------------------------------------
+
+
+
+
+    //-------------------UUID message-------------------------------------
     if (memcmp(LiftValues->currentDriver,LiftValues->previousDriver,sizeof(LiftValues->currentDriver)) != 0){
 
         memcpy(LiftValues->previousDriver,LiftValues->currentDriver,sizeof(LiftValues->currentDriver));
@@ -98,6 +153,9 @@ bool sendMQTT(MQTTHandler* MQTT_INSTANCE,ForkLift* LiftValues){
         snprintf(msg, sizeof(msg), "%02X%02X%02X%02X",LiftValues->currentDriver[0],LiftValues->currentDriver[1],LiftValues->currentDriver[2],LiftValues->currentDriver[3]);
         esp_mqtt_client_publish(MQTT_INSTANCE->handler, "toyLift1/driver", msg, 0, 2, 0);
     }
+    //----------------------------------------------------------------
     
+
+
 return true;
 }

@@ -1,23 +1,38 @@
-#ifndef microphone_H
-#define microphone_H
+/* Matthew Tuer 
+november 10th, 2025
+mtuer3727@conestogac.on.ca
+matthewjtuer@gmail.com 
+*/
+#ifndef ICS43434_H
+#define ICS43434_H
+#include <stdint.h>
 
-#include "driver/gpio.h"
+#include "freertos/FreeRTOS.h"
+#include "driver/i2s_std.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 
-#define D0_PIN        GPIO_NUM_41   // Sound sensor digital output (DO)
-#define RED_LED       GPIO_NUM_19   // RED LED pin
 
-// Initialize GPIOs for the loud-noise detector
-void microphoneInit(void);
+typedef struct {
 
-// Loop that monitors the sensor and controls the LED
-int microphoneLevel();
+    float warningSustainedDB;
+    float warningInstantDB;
+    float sustainedSeconds;
+    bool FPS;
+    uint16_t sampleRate;
+    uint16_t frameSamples;
+    float offset;
+    i2s_chan_handle_t handle; 
+    int32_t buffer[2048];
 
-#ifdef __cplusplus
-}
-#endif
+    int frameOverCount;
+    float dbLevel;
+    bool dbHigh;
+    bool dbHighSustained;
+     
+}  ICS43434;
 
-#endif
+ICS43434* InitICS(i2s_chan_handle_t);
+
+bool checkMicLevel(ICS43434*);
+
+#endif 

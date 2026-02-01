@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Drivers | ForkGuard</title>
+  <link rel="stylesheet" href="drivers.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img class="brand-logo" src="driverAssets/forkGuardLogo.png" alt="ForkGuard logo">
+      <div class="brand-text">
+        <div class="brand-name">FORKGUARD</div>
+        <div class="brand-sub">Forklift Safety Monitoring System</div>
+      </div>
+    </div>
+
+    <nav class="topnav">
+      <a href="#" class="nav-link active">Drivers</a>
+      <a href="#" class="nav-link">Forklifts</a>
+      <a href="#" class="nav-link">Accident Reports</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <section class="page-head">
+      <h1>Drivers</h1>
+      <p class="subtitle">Expandable list of driver flag counts and graphs.</p>
+    </section>
+
+    <section class="controls">
+      <div class="control">
+        <label for="sortBy">Sort by</label>
+        <select id="sortBy">
+          <option value="name">Name</option>
+          <option value="flag1">Flag 1</option>
+          <option value="flag2">Flag 2</option>
+          <option value="flag3">Flag 3</option>
+          <option value="flag4">Flag 4</option>
+          <option value="flag5">Flag 5</option>
+        </select>
+      </div>
+
+      <div class="control">
+        <label for="sortDir">Direction</label>
+        <select id="sortDir">
+          <option value="desc">High → Low</option>
+          <option value="asc">Low → High</option>
+        </select>
+      </div>
+
+      <button id="applySort" class="btn">Apply</button>
+    </section>
+
+    <section class="drivers">
+      <div class="drivers-head">
+        <div class="col name">Driver</div>
+        <div class="col">Flag1</div>
+        <div class="col">Flag2</div>
+        <div class="col">Flag3</div>
+        <div class="col">Flag4</div>
+        <div class="col">Flag5</div>
+      </div>
+
+      <!-- JS injects driver rows here -->
+      <div id="driverList" class="drivers-list"></div>
+    </section>
+  </main>
+
+  <!-- ✅ Separate JS file (loads after HTML so elements exist) -->
+  <script src="drivers.js"></script>
+</body>
+</html>

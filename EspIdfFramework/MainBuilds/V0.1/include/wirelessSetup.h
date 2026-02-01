@@ -7,7 +7,9 @@
 typedef struct {
     
     bool weightLatch;
+    bool weightErrorLatch;
     bool brakeLatch;
+    bool brakeErrorLatch;
     bool gasLatch;
     bool noiseLatch;
     bool UUIDLAtch;
