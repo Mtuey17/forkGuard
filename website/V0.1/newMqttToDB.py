@@ -23,7 +23,7 @@ MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 
 BASE = "toyLift1"
 TOPIC_SENSORS = f"{BASE}/sensors"
-TOPIC_DRIVER = f"{BASE}/driver"  # payload = UUID
+TOPIC_DRIVER = f"{BASE}/driver"  # payload = UUID (rfid_tag)
 
 # These topics only publish when the event happens (increment by 1 each message)
 EVENT_TOPICS = {
@@ -45,75 +45,69 @@ def get_conn():
     return mysql.connector.connect(**DB_CONFIG)
 
 
-def ensure_driver_row(conn, driver_name: str):
+def normalize_uuid(u: str) -> str:
     """
-    Ensure a row exists for this driver in the drivers table.
-    Requires columns:
-      name, weightWarning, weightError, brakeWarning, brakeError, gas
+    Normalize UUID/RFID tag to a consistent format.
+    Even if you publish no spaces, this is harmless and prevents future bugs.
     """
-    # Best case: UNIQUE(name) exists, so ON DUPLICATE KEY works.
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO drivers
-                  (name, weightWarning, weightError, brakeWarning, brakeError, gas)
-                VALUES (%s, 0, 0, 0, 0, 0)
-                ON DUPLICATE KEY UPDATE name = VALUES(name);
-                """,
-                (driver_name,),
-            )
-            conn.commit()
-            return
-    except Error:
-        # If UNIQUE(name) does not exist, fall back to "check then insert"
-        pass
+    if not u:
+        return ""
+    return u.strip().replace(" ", "").upper()
 
+
+def resolve_driver_name_by_uuid(conn, uuid: str) -> str | None:
+    """
+    Look up driver name in the drivers table using rfid_tag.
+    Returns None if not found.
+    """
+    with conn.cursor(dictionary=True) as cur:
+        cur.execute("SELECT name FROM drivers WHERE rfid_tag = %s LIMIT 1", (uuid,))
+        row = cur.fetchone()
+        if row and row.get("name"):
+            return str(row["name"])
+    return None
+
+
+def ensure_driver_row_by_uuid(conn, uuid: str, name: str | None = None):
+    """
+    Ensure there is exactly ONE row per UUID (rfid_tag).
+    This requires drivers.rfid_tag to be UNIQUE.
+
+    If the row exists, keep counters as-is.
+    If name is provided, update name (useful if you change a driver name later).
+    """
     with conn.cursor() as cur:
-        cur.execute("SELECT 1 FROM drivers WHERE name = %s LIMIT 1", (driver_name,))
-        if cur.fetchone() is None:
-            cur.execute(
-                """
-                INSERT INTO drivers
-                  (name, weightWarning, weightError, brakeWarning, brakeError, gas)
-                VALUES (%s, 0, 0, 0, 0, 0)
-                """,
-                (driver_name,),
-            )
-            conn.commit()
+        cur.execute(
+            """
+            INSERT INTO drivers (name, rfid_tag, weightWarning, weightError, brakeWarning, brakeError, gas)
+            VALUES (%s, %s, 0, 0, 0, 0, 0)
+            ON DUPLICATE KEY UPDATE
+                name = COALESCE(VALUES(name), name);
+            """,
+            (name if name else None, uuid),
+        )
+        conn.commit()
 
 
-def increment_driver_counter(conn, driver_name: str, column: str):
+def increment_counter_by_uuid(conn, uuid: str, column: str):
     """
-    Atomic increment: UPDATE drivers SET column = column + 1 WHERE name = ?
+    Increment counter for the driver identified by UUID (rfid_tag).
+    This can only affect one row if rfid_tag is unique.
     """
     allowed = {"weightWarning", "weightError", "brakeWarning", "brakeError", "gas"}
     if column not in allowed:
         print(f"Invalid counter column: {column}")
         return
 
-    ensure_driver_row(conn, driver_name)
-
-    sql = f"UPDATE drivers SET {column} = {column} + 1 WHERE name = %s"
+    sql = f"UPDATE drivers SET {column} = {column} + 1 WHERE rfid_tag = %s"
     with conn.cursor() as cur:
-        cur.execute(sql, (driver_name,))
+        cur.execute(sql, (uuid,))
         conn.commit()
+
         if cur.rowcount != 1:
-            print(f"Warning: increment affected {cur.rowcount} rows (driver={driver_name}, column={column})")
-
-
-def resolve_driver_name(conn, uuid: str) -> str:
-    with conn.cursor(dictionary=True) as cur:
-        cur.execute(
-            "SELECT name FROM drivers WHERE rfid_tag = %s LIMIT 1",
-            (uuid,),
-        )
-        row = cur.fetchone()
-        if row and row.get("name"):
-            return row["name"]
-
-    return f"Driver-{uuid[-6:]}" if uuid else "Unknown"
-
+            # rowcount 0 means UUID row missing (shouldn't happen if ensure is called)
+            # rowcount >1 means your UNIQUE constraint is not actually unique
+            print(f"Warning: increment affected {cur.rowcount} rows (uuid={uuid}, column={column})")
 
 
 def add_sensor_data(conn, forklift_id: int, sensor_type: str, sensor_value: float):
@@ -169,20 +163,34 @@ def on_message(client, userdata, message):
     global CURRENT_DRIVER_UUID, CURRENT_DRIVER_NAME
 
     topic = message.topic
-    payload = message.payload.decode("utf-8", errors="replace").strip()
+    payload = message.payload.decode("utf-8", errors="replace")
 
     # -------------------------
     # DRIVER UUID TOPIC
     # -------------------------
     if topic == TOPIC_DRIVER:
-        CURRENT_DRIVER_UUID = payload
+        uuid = normalize_uuid(payload)
+        CURRENT_DRIVER_UUID = uuid
 
         try:
             conn = get_conn()
-            CURRENT_DRIVER_NAME = resolve_driver_name(conn, payload)
-            print(f"Active driver set: uuid={payload} -> name={CURRENT_DRIVER_NAME}")
+
+            # Try to resolve existing name for this UUID
+            name = resolve_driver_name_by_uuid(conn, uuid)
+
+            # If not found, pick a placeholder name (you can change later in DB)
+            if not name:
+                name = f"Driver-{uuid[-6:]}" if uuid else "Unknown"
+
+            # Ensure one row exists for this UUID (never duplicates)
+            ensure_driver_row_by_uuid(conn, uuid, name)
+
+            CURRENT_DRIVER_NAME = name
+            print(f"Active driver set: uuid={uuid} -> name={CURRENT_DRIVER_NAME}")
+
         except Error as e:
-            print("DB error resolving driver:", e)
+            print("DB error resolving/ensuring driver:", e)
+            CURRENT_DRIVER_UUID = None
             CURRENT_DRIVER_NAME = None
         finally:
             try:
@@ -196,17 +204,23 @@ def on_message(client, userdata, message):
     # EVENT TOPICS (increment count)
     # -------------------------
     if topic in EVENT_TOPICS:
-        # Recommended: ignore events until we know who the driver is
-        if not CURRENT_DRIVER_NAME:
-            print(f"Event {topic} received but no active driver set; ignoring")
+        if not CURRENT_DRIVER_UUID:
+            print(f"Event {topic} received but no active driver UUID set; ignoring")
             return
 
         column = EVENT_TOPICS[topic]
 
         try:
             conn = get_conn()
-            increment_driver_counter(conn, CURRENT_DRIVER_NAME, column)
-            print(f"Incremented {column} for {CURRENT_DRIVER_NAME}")
+
+            # Make sure row exists (safe even if it already exists)
+            ensure_driver_row_by_uuid(conn, CURRENT_DRIVER_UUID, CURRENT_DRIVER_NAME)
+
+            # Increment only the row matching this UUID
+            increment_counter_by_uuid(conn, CURRENT_DRIVER_UUID, column)
+
+            print(f"Incremented {column} for {CURRENT_DRIVER_NAME} ({CURRENT_DRIVER_UUID})")
+
         except Error as e:
             print("DB error incrementing counter:", e)
         finally:
@@ -221,7 +235,6 @@ def on_message(client, userdata, message):
     # SENSOR STREAM
     # -------------------------
     if topic == TOPIC_SENSORS:
-        # Example payload: "MaxWeight:123, CurrentWeight:45"
         data = parse_kv_csv(payload)
 
         try:
