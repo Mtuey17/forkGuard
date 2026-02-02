@@ -34,11 +34,11 @@
         <label for="sortBy">Sort by</label>
         <select id="sortBy">
           <option value="name">Name</option>
-          <option value="flag1">Flag 1</option>
-          <option value="flag2">Flag 2</option>
-          <option value="flag3">Flag 3</option>
-          <option value="flag4">Flag 4</option>
-          <option value="flag5">Flag 5</option>
+          <option value="weightWarning">Weight Warning</option>
+          <option value="weightError">Weight Error</option>
+          <option value="brakeWarning">Brake Warning</option>
+          <option value="brakeError">Brake Error</option>
+          <option value="gas">Gas</option>
         </select>
       </div>
 
@@ -56,11 +56,11 @@
     <section class="drivers">
       <div class="drivers-head">
         <div class="col name">Driver</div>
-        <div class="col">Flag1</div>
-        <div class="col">Flag2</div>
-        <div class="col">Flag3</div>
-        <div class="col">Flag4</div>
-        <div class="col">Flag5</div>
+        <div class="col">Weight Warn</div>
+        <div class="col">Weight Err</div>
+        <div class="col">Brake Warn</div>
+        <div class="col">Brake Err</div>
+        <div class="col">Gas</div>
       </div>
 
       <!-- JS injects driver rows here -->
@@ -68,7 +68,6 @@
     </section>
   </main>
 
-  <!-- ✅ Separate JS file (loads after HTML so elements exist) -->
   <script src="drivers.js"></script>
 </body>
 </html>
