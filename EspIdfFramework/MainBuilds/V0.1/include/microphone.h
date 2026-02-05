@@ -17,7 +17,7 @@ typedef struct {
     float warningSustainedDB;
     float warningInstantDB;
     float sustainedSeconds;
-    bool FPS;
+    int FPS;
     uint16_t sampleRate;
     uint16_t frameSamples;
     float offset;

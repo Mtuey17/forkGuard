@@ -1,0 +1,35 @@
+{
+    "theme_name" : "my_custom",
+    "app_color" : {
+        "dark_one" : "#dddddd",
+        "dark_two" : "#dddddd",
+        "dark_three" : "#dddddd",
+        "dark_four" : "#bbbbbb",
+        "bg_one" : "#eeeeee",
+        "bg_two" : "#eeeeee",
+        "bg_three" : "#dddddd",
+        "icon_color" : "#130c0e",
+        "icon_hover" : "#130c0e",
+        "icon_pressed" : "#130c0e",
+        "icon_active" : "#130c0e",
+        "context_color" : "#78cdd1",
+        "context_hover" : "#78cdd1",
+        "context_pressed" : "#78cdd1",
+        "text_title" : "#464547",
+        "text_foreground" : "#130c0e",
+        "text_description" : "#999d9c",
+        "text_active" : "#130c0e",
+        "white" : "#f5f6f9",
+        "pink" : "#ff007f",
+        "green" : "#006c54",
+        "red" : "#ff5555",
+        "yellow" : "#f1fa8c",
+        "gray": "#828282",
+        "gray_one": "#9C9C9C",
+        "gray_two": "#CFCFCF"
+    },
+    "image_path":{
+        "icon_path": "gui/images/icons",
+        "icon_svg_path": "gui/images/svg_icons"
+    }
+}

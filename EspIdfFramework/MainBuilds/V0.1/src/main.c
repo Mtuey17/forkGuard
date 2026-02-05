@@ -153,8 +153,10 @@ void app_main() {
         //------------OUTPUTS AND NETWORKING-------------
         drawWeightChart(OLED,toyLift->currentLoad,toyLift->maxDynamicLoad);
         sendMQTT(MQTT,toyLift);
-        ESP_LOGI("main","maxAccel: %f | currentAccel: %f",toyLift->maxAcceleration,toyLift->currentAccel);
-        ESP_LOGI("main","pitch: %d | maxLoad: %f kg| currentLoad: %f kg| height: %dcm|GAS:%d|UID:%02X%02X%02X%02X",IMU->pitch,toyLift->maxDynamicLoad,toyLift->currentLoad,TOF->distance,toyLift->gas,toyLift->currentDriver[0], toyLift->currentDriver[1], toyLift->currentDriver[2], toyLift->currentDriver[3]);
+
+        //ESP_LOGI("main","%f",microphone->dbLevel);
+        //ESP_LOGI("main","maxAccel: %f | currentAccel: %f",toyLift->maxAcceleration,toyLift->currentAccel);
+        //ESP_LOGI("main","pitch: %d | maxLoad: %f kg| currentLoad: %f kg| height: %dcm|GAS:%d|UID:%02X%02X%02X%02X",IMU->pitch,toyLift->maxDynamicLoad,toyLift->currentLoad,TOF->distance,toyLift->gas,toyLift->currentDriver[0], toyLift->currentDriver[1], toyLift->currentDriver[2], toyLift->currentDriver[3]);
         //------------OUTPUTS AND NETWORKING-------------
 
 

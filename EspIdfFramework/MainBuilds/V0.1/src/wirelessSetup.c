@@ -104,14 +104,14 @@ bool sendMQTT(MQTTHandler* MQTT_INSTANCE,ForkLift* LiftValues){
     gpio_set_level(GPIO_NUM_48,0);
     }
     //exceeding max 
-    if (LiftValues->currentLoad>LiftValues->maxDynamicLoad&&!MQTT_INSTANCE->weightErrorLatch){
+    if (LiftValues->currentLoad>=LiftValues->maxDynamicLoad&&!MQTT_INSTANCE->weightErrorLatch){
         MQTT_INSTANCE->weightErrorLatch=true;
         char msg[128];
 
         snprintf(msg, sizeof(msg), "Excedded_Weight_Max");
         esp_mqtt_client_publish(MQTT_INSTANCE->handler, "toyLift1/weightError", msg, 0, 2, 0);
     }
-     if (LiftValues->currentLoad<LiftValues->maxDynamicLoad&&allowWeightWarning){
+     if (LiftValues->currentLoad<LiftValues->maxDynamicLoad){
         MQTT_INSTANCE->weightErrorLatch=false;
      }
      //-----------------------------------------------------------------------

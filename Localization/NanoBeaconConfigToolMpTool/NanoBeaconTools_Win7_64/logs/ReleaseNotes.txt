@@ -1,0 +1,131 @@
+v3.2.29
+1. support option to add register write commands to the beginning of region 2 instead of to the end
+2. MP cmd tool supports modify advertising payload
+
+v3.2.28
+1. add option of register value trigger en
+2. optimize reset time
+3. add burn delay option
+
+v3.2.27
+1. add warning for XO settings
+
+v3.2.26
+1. add disable adv random delay option
+2. optimize region2 size
+
+v3.2.25
+1. support WLCSP10 chip
+2. add static address options
+
+v3.2.24
+1. fixed CTE issue
+2. update TX power table
+
+v3.2.23
+1. add pa gain option for TX
+
+v3.2.22
+1. optimized eFuse burn
+
+v3.2.21
+1. MP cmd Tool support to config encrypt key
+2. fixed GPIO High level trigger stuck issue
+
+v3.2.20
+1. support full range industrial chip
+
+v3.2.19
+1. Set the key unreadable
+2.  fixed I2C Slave #3 address issue
+
+v3.2.17
+1. support register delay command in Advanced Settings
+2. support square wave
+3. disable static random address
+
+v3.2.16
+1. disable GPIO wakeup config from GUI
+
+v3.2.15
+1. add QR Code for configuration data
+2. remove QR Code of ADV. set
+
+V3.2.14
+1. Fixed Big Endian issue
+2. support hacking region2
+3. add i2c sw0 control option
+
+V3.2.12
+1. Support quadrature encoder
+2. local name support utf-8 code
+
+V3.2.11
+1.Fixed UI issue. TAG encrypt option checked issue 
+
+V3.2.10
+1. Fixed GPIO low level trigger issue
+2. remove WDT patch
+3. add TX interval limit
+
+V3.2.9
+1. optimize WDT setting
+
+V3.2.8
+1. add WDT patch
+
+V3.2.7
+1. Limit the use of  DFN8's GPIO4/5
+
+V3.2.6
+1. fixed sleep mode pulse count issue
+2. fixed XO cap setting issue 
+
+V3.2.4
+1. support static random
+2. GPIO status support trigger snapshot
+
+V3.2.3
+1. support setting random delay of advertising
+2. support upgrade in linux os
+
+V3.2.2
+1. support sampling data of 1-wire sensor in sleep mode
+2. supports setting different GPIO output levels between wake and sleep
+
+V3.2.1
+1. support cte config
+2. support SDR config
+3. optimize region2 size
+
+V3.2.0
+1. fixed gpio trigger issue
+
+V3.1.13
+1. update default address settings
+2. fixed trigger snapshot issue
+
+V3.1.12
+1. update eddystone ui
+2. update i2c commands ui
+
+V3.1.11
+1. support sensor snapshot
+
+V3.1.10
+1. fixed the issue that RF test TX power setting 
+
+V3.1.9
+1. update user guide document
+
+V3.1.8
+1. ADD latch Settings for ADC's MGPIO
+
+V3.1.7
+1. fixed multiple ADC channel  calibration issue
+
+V3.1.6
+1. Fixed converting i2C configuration to raw data issue
+2. fixed loading random address configuration file issue
+3. update i2C commands UI
+4. GPIO Setting add latch option
