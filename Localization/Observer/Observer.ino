@@ -1,235 +1,149 @@
 /*
-Matthew Tuer, June 11, 2024 
+Matthew Tuer
 
-V0.2
 
-changed logic 
-actually seems to work worse than previous version :)
-
-scanning for one second
-recording all anchors, taking an average of all RSSIs 
-scanning two more times 
-reporting closest anchor 
-repeate 
-
+- Scan multiple times
+- Average RSSI for each Anchor across scans
+- Output closest Anchor through uart 
 */
 
 #include <Arduino.h>
 #include <BLEDevice.h>
-#include <BLEUtils.h>
 #include <BLEScan.h>
 #include <BLEAdvertisedDevice.h>
-#include <BLEEddystoneURL.h>
-#include <BLEEddystoneTLM.h>
-#include <BLEBeacon.h>
-#include <WiFi.h>
-#include <PubSubClient.h>
 
-const char* ssid = "bleNet";
-const char* password = "12345678";
-const char* mqtt_server = "bleServer.local";
-
-WiFiClient espClient;
-PubSubClient client(espClient);
-
-int scanTime = 1;  // in seconds
 BLEScan* pBLEScan;
 
-const int maxDevices = 20;
-String anchorNames[maxDevices];
-int anchorRSSI[maxDevices];
-int anchorSeenCount[maxDevices];
-int anchorCount = 0;
-String previousAnchor = "";
 
-String tagName = "Tag1";
-int scanCount=0; 
-bool allowSkip=true;
-bool skipSend=false;
-bool seenPreviousAnchor=false;
+static const int SCAN_TIME_SECONDS   = ;   // length of each BLE scan
+static const int SCANS_PER_REPORT    = 4;   // number of scans to average before reporting
+static const int MAX_DEVICES         = 20;  // max anchors to track
+static const int MIN_REQUIRED_SEEN   = 1;   // must see an anchor at least this many times
 
 
-void setup_wifi() {
-  delay(500);
-  setCpuFrequencyMhz(80);  // Reduce power usage
-  Serial.println();
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
+String anchorNames[MAX_DEVICES];
+int    anchorRSSISum[MAX_DEVICES];
+int    anchorSeenCount[MAX_DEVICES];
+int    anchorCount = 0;
 
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
+int scanCount = 0;
+
+// Find index of anchor name; returns -1 if not found
+int findAnchorIndex(const String& name) {
+  for (int i = 0; i < anchorCount; i++) {
+    if (anchorNames[i] == name) return i;
   }
-
-  Serial.println("\nWiFi connected");
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
+  return -1;
 }
 
-void sendNearestAnchor() {
-  BLEScanResults* foundDevices = pBLEScan->start(scanTime, false);
-  //delay(200)
-  pBLEScan->stop();
-  int totalFoundDevices = foundDevices->getCount();
+void resetAnchors() {
+  for (int i = 0; i < anchorCount; i++) {
+    anchorNames[i] = "";
+    anchorRSSISum[i] = 0;
+    anchorSeenCount[i] = 0;
+  }
+  anchorCount = 0;
+  scanCount = 0;
+}
+
+void doOneScanAccumulate() {
   Serial.println("Scanning...");
 
-  for (int i = 0; i < totalFoundDevices; i++) {
-    BLEAdvertisedDevice device = foundDevices->getDevice(i);
-    if (device.haveName()) {
-      String devName = device.getName().c_str();
+  BLEScanResults* results = pBLEScan->start(SCAN_TIME_SECONDS, false);
+  pBLEScan->stop();
 
-      if (devName.startsWith("Anchor")) {
-        bool alreadyStored = false;
+  int total = results->getCount();
 
-        for (int j = 0; j < anchorCount; j++) {
-          if (anchorNames[j] == devName) {
-            alreadyStored = true;
-            anchorRSSI[j] += device.getRSSI();  // update RSSI if already exists
-            anchorSeenCount[j]++;
-            break;
-          }
-        }
+  for (int i = 0; i < total; i++) {
+    BLEAdvertisedDevice dev = results->getDevice(i);
 
-        if (!alreadyStored && anchorCount < maxDevices) {
-          anchorNames[anchorCount] = devName;
-          anchorRSSI[anchorCount]+= device.getRSSI();
-          
-          anchorCount++;
-        }
-      }
+    if (!dev.haveName()) continue;
+
+    String name = dev.getName().c_str();
+    if (!name.startsWith("Anchor")) continue;
+
+    int rssi = dev.getRSSI();
+
+    int idx = findAnchorIndex(name);
+    if (idx >= 0) {
+      anchorRSSISum[idx] += rssi;
+      anchorSeenCount[idx] += 1;
+    } else if (anchorCount < MAX_DEVICES) {
+      anchorNames[anchorCount]    = name;
+      anchorRSSISum[anchorCount]  = rssi;
+      anchorSeenCount[anchorCount]= 1;
+      anchorCount++;
     }
   }
 
   scanCount++;
-  if (scanCount==4){
-    int maxRSSI = anchorRSSI[0]/1;
-    int maxIndex = 0;
-  Serial.print("Current Anchors: ");
-  for (int i = 0; i < anchorCount; i++) {
-
-    if (((anchorRSSI[i]/anchorSeenCount[i]) > maxRSSI)) {
-    maxRSSI = anchorRSSI[i]/anchorSeenCount[i];
-    maxIndex = i;
-    }
-
-    Serial.print(anchorNames[i]);
-    Serial.print(" (RSSI: ");
-    Serial.print(anchorRSSI[i]);
-    Serial.print("),");
-    Serial.print("seen: ");
-    Serial.print(anchorSeenCount[i]);
-    Serial.print(", ");
-
-    if (anchorNames[i]==previousAnchor){
-      seenPreviousAnchor=true; 
-    }
-  }
-
-  bool anchorConfidence=false;
-  float maxAnchor=anchorRSSI[maxIndex]/anchorSeenCount[maxIndex];
-  for (int i = 0; i < anchorCount; i++) {
-
-    float acceptableDifference=3.0;
-    float currentAnchor=anchorRSSI[i]/anchorSeenCount[i];
-    float difference = abs(currentAnchor-maxAnchor);
-    //Serial.println(difference);
-    if (anchorCount<=1){
-      anchorConfidence=true;
-      break;
-
-    }
-    if (difference>=acceptableDifference){
-      anchorConfidence=true;
-    }
-    else if (difference<acceptableDifference&&i!=maxIndex){
-      anchorConfidence=false;
-      //Serial.println("no anchor confidence");
-      break;
-    }
-
-
-  }
-
-
-
-   
-  Serial.println();
-  //Serial.print("Max RSSI: ");
-  //Serial.println(String(anchorNames[maxIndex]));
-  
-  //skipping publish ONCE if
-  //only 1 anchor is seen
-  //previous closest anchor is not seen at all 
-  if ((anchorCount<=1&&allowSkip||!seenPreviousAnchor&&allowSkip)||!anchorConfidence){
-    skipSend=true;
-    allowSkip=false ;
-    Serial.println("skipping send...");
-  }
-
-  if (!skipSend){
-  
-  String msg = tagName + ":" + anchorNames[maxIndex];
-  char msgBuffer[50];
-  Serial.println("MQTT Sent: " + msg);
-  msg.toCharArray(msgBuffer, sizeof(msgBuffer));
-  client.publish("bleLocalization/Tags", msgBuffer);
-  allowSkip=true;
-  }
-  else{
-    skipSend=false;
-  }
-  previousAnchor=anchorNames[maxIndex];
-  
-
-
-
-  //clearing arrays 
-  for (int i = 0; i < anchorCount; i++) {
-    anchorNames[i]="";
-    anchorRSSI[i]=0;
-    anchorSeenCount[i]=1;
-  }
-  scanCount=0;
-  anchorCount=0;
-  seenPreviousAnchor=false; 
-
-  }
-
 
   pBLEScan->clearResults();
 }
 
+void reportClosestOverUart() {
+  if (anchorCount == 0) {
+    Serial.println("NONE");   // nothing seen
+    return;
+  }
+
+  int bestIdx = -1;
+  float bestAvg = -9999.0f;
+
+  // debug print all anchors + averages
+  Serial.print("Anchors: ");
+  for (int i = 0; i < anchorCount; i++) {
+    if (anchorSeenCount[i] <= 0) continue;
+    float avg = (float)anchorRSSISum[i] / (float)anchorSeenCount[i];
+
+    Serial.print(anchorNames[i]);
+    Serial.print(" avg=");
+    Serial.print(avg, 1);
+    Serial.print(" seen=");
+    Serial.print(anchorSeenCount[i]);
+    Serial.print(" | ");
+
+    if (anchorSeenCount[i] >= MIN_REQUIRED_SEEN && avg > bestAvg) {
+      bestAvg = avg;
+      bestIdx = i;
+    }
+  }
+  Serial.println();
+
+  if (bestIdx < 0) {
+    Serial.println("NONE");
+    return;
+  }
+
+  // ---- THIS is the UART output you want: just the closest anchor name ----
+  Serial.println(anchorNames[bestIdx]);
+}
+
 void setup() {
   Serial.begin(115200);
-  setup_wifi();
+  delay(200);
+
   Serial.println("Initializing BLE scan...");
 
   BLEDevice::init("");
   pBLEScan = BLEDevice::getScan();
   pBLEScan->setActiveScan(true);
+
+  // Your old values (fast scanning)
   pBLEScan->setInterval(50);
   pBLEScan->setWindow(50);
 
-  
-  client.setServer(mqtt_server, 1883);
-
-  for (int i = 0; i < maxDevices; i++) {
-  anchorSeenCount[i] = 1;
-}
-
+  resetAnchors();
 }
 
 void loop() {
-  if (!client.connected()) {
-    Serial.println("MQTT not connected...");
-    client.connect("Tag1");
-    scanCount=0;
-  anchorCount=0;
-  } else {
-    client.loop();
-    sendNearestAnchor();
+  doOneScanAccumulate();
+
+  if (scanCount >= SCANS_PER_REPORT) {
+    reportClosestOverUart();
+    resetAnchors();          // start a fresh averaging window
   }
 
-  //delay(2000);  // BLE scan every 2 seconds
+  // optional small pause between scans
+  // delay(50);
 }
