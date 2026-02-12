@@ -25,7 +25,12 @@ ICS43434* InitICS(i2s_chan_handle_t i2s_handler){
 
 bool checkMicLevel(ICS43434* ICS_Instance){
 size_t bytesRead = 0;
-i2s_channel_read(ICS_Instance->handle, ICS_Instance-> buffer, sizeof(ICS_Instance-> buffer), &bytesRead, portMAX_DELAY);
+esp_err_t err = i2s_channel_read(ICS_Instance->handle, ICS_Instance->buffer,
+                                sizeof(ICS_Instance->buffer),
+                                &bytesRead, pdMS_TO_TICKS(50));
+
+if (bytesRead == 0) return false;
+
 int n = bytesRead / sizeof(int32_t);
 int32_t mn = INT32_MAX, mx = INT32_MIN;
 for (int i = 0; i < n; i++) {
@@ -33,12 +38,8 @@ for (int i = 0; i < n; i++) {
     if (v < mn) mn = v;
     if (v > mx) mx = v;
 }
-ESP_LOGI("mic", "raw min=%ld max=%ld first8=%ld %ld %ld %ld %ld %ld %ld %ld",
-         (long)mn, (long)mx,
-         (long)ICS_Instance->buffer[0], (long)ICS_Instance->buffer[1],
-         (long)ICS_Instance->buffer[2], (long)ICS_Instance->buffer[3],
-         (long)ICS_Instance->buffer[4], (long)ICS_Instance->buffer[5],
-         (long)ICS_Instance->buffer[6], (long)ICS_Instance->buffer[7]);
+
+
 
 
 

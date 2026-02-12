@@ -72,7 +72,7 @@ void app_main() {
     #define PIN_SD  GPIO_NUM_8
 
     i2s_chan_config_t channel_config = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO, I2S_ROLE_MASTER);
-    i2s_chan_handle_t I2S_Handle;
+    i2s_chan_handle_t I2S_Handle=NULL;
     i2s_new_channel(&channel_config, NULL, &I2S_Handle);
     i2s_std_config_t std_cfg = {
         .clk_cfg  = I2S_STD_CLK_DEFAULT_CONFIG(48000),
@@ -119,7 +119,10 @@ void app_main() {
 
     
     
+
     while(1){
+     
+
 
 
         //----------------DATA AQUISITION----------------
@@ -154,7 +157,7 @@ void app_main() {
         drawWeightChart(OLED,toyLift->currentLoad,toyLift->maxDynamicLoad);
         sendMQTT(MQTT,toyLift);
 
-        //ESP_LOGI("main","%f",microphone->dbLevel);
+        ESP_LOGI("main","noseDB: %f | HT: %d | CHT: %d",microphone->dbLevel,microphone->dbHigh,microphone->dbHighSustained);
         //ESP_LOGI("main","maxAccel: %f | currentAccel: %f",toyLift->maxAcceleration,toyLift->currentAccel);
         //ESP_LOGI("main","pitch: %d | maxLoad: %f kg| currentLoad: %f kg| height: %dcm|GAS:%d|UID:%02X%02X%02X%02X",IMU->pitch,toyLift->maxDynamicLoad,toyLift->currentLoad,TOF->distance,toyLift->gas,toyLift->currentDriver[0], toyLift->currentDriver[1], toyLift->currentDriver[2], toyLift->currentDriver[3]);
         //------------OUTPUTS AND NETWORKING-------------

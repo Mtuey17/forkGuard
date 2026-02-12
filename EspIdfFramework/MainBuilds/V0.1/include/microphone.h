@@ -11,6 +11,8 @@ matthewjtuer@gmail.com
 #include "driver/i2s_std.h"
 
 
+#define MIC_FRAME_SAMPLES 1024
+#define MIC_CHANS         2
 
 typedef struct {
 
@@ -22,7 +24,7 @@ typedef struct {
     uint16_t frameSamples;
     float offset;
     i2s_chan_handle_t handle; 
-    int32_t buffer[2048];
+    int32_t buffer[MIC_FRAME_SAMPLES * MIC_CHANS];
 
     int frameOverCount;
     float dbLevel;

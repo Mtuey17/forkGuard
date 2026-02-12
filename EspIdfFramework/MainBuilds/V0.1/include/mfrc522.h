@@ -12,8 +12,8 @@
 #define PIN_NUM_MOSI 11 // 
 #define PIN_NUM_CLK  12 // AKA SCK
 #define PIN_NUM_CS   10  // AKA SDA
-#define PIN_NUM_RST  18
-#define LED_GREEN    8    // LED pin
+#define PIN_NUM_RST  3
+#define LED_GREEN    46   // LED pin
 
 // Initializes GPIO, reset pin, SPI, and MFRC522.
 esp_err_t mfrc522_init(void);
