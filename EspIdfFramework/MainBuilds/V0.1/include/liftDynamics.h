@@ -12,6 +12,8 @@ matthewjtuer@gmail.com
 
 
 
+
+
 typedef struct {
     
     
@@ -28,13 +30,14 @@ typedef struct {
     float safetyFactor;
     float loadScore;
     float brakeScore; 
+    float loadBalance;
+    float highestWeightToday;
+    float hardestBraketoday;
 
     uint8_t currentDriver[4];
     uint8_t previousDriver[4];
-
     uint8_t gas;
     uint8_t noise;
-
    
 } ForkLift;
 

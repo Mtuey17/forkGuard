@@ -3,6 +3,9 @@
 #include "esp_timer.h"
 #include <stdio.h>
 #include "esp_log.h"
+#include <math.h>
+
+
 
 
 HX711_t *HX711_init(uart_port_t uart_num, uint8_t Rx,uint8_t Tx, uint32_t baudRate,uint8_t id, float wToGRatio){
@@ -78,7 +81,7 @@ long HX711_updateWeight(HX711_t *hx, uint16_t timeout_ms){
     data-=hx->offset;
     hx->Weight=data;
     hx->kgWeight=((float)data*hx->ratio)/1000;
-
+    hx->kgWeight=fabs(hx->kgWeight);
     return hx->Weight;
 }
 

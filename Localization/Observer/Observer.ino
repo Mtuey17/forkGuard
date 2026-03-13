@@ -4,6 +4,7 @@
    - EMA smoothing across scans (more stable than simple average)
    - Serial monitor: debug
    - AnchorUart (UART2): ONLY closest anchor name (or "NONE")
+   - INT pin pulses HIGH whenever UART data is sent
 */
 
 #include <Arduino.h>
@@ -16,36 +17,38 @@ BLEScan* pBLEScan;
 // ---------------------------
 // CONFIG
 // ---------------------------
-static const int   SCAN_TIME_SECONDS = 5;     // length of each BLE scan
-static const int   SCANS_PER_REPORT  = 2;     // how many scans per decision
-static const int   MAX_DEVICES       = 20;    // max anchors tracked
-static const int   MIN_REQUIRED_SEEN = 2;     // must show up in at least this many scans (per report window)
-static const float EMA_ALPHA         = 0.45f; // 0..1 (higher = reacts faster, lower = smoother)
-
-// If you want more range/accuracy, active scan helps but costs power/time.
-// For just RSSI, passive often works fine too.
+static const int   SCAN_TIME_SECONDS = 5;
+static const int   SCANS_PER_REPORT  = 2;
+static const int   MAX_DEVICES       = 20;
+static const int   MIN_REQUIRED_SEEN = 2;
+static const float EMA_ALPHA         = 0.45f;
 static const bool  USE_ACTIVE_SCAN   = true;
 
 // ---------------------------
 // SECOND UART (name-only output)
 // ---------------------------
 HardwareSerial AnchorUart(2);
-static const int ANCHOR_UART_TX = 17;       // <-- set to your wired TX pin
-static const int ANCHOR_UART_RX = 16;       // <-- set to your wired RX pin (optional if not reading)
+static const int ANCHOR_UART_TX = 12;
+static const int ANCHOR_UART_RX = 13;
 static const uint32_t ANCHOR_UART_BAUD = 115200;
+
+// ---------------------------
+// UART INTERRUPT PIN
+// ---------------------------
+static const int UART_INT_PIN = 15;              // choose any free GPIO
+static const uint32_t UART_INT_PULSE_MS = 10;    // pulse width
 
 // ---------------------------
 // Anchor tracking (persistent during window)
 // ---------------------------
 String anchorNames[MAX_DEVICES];
-String anchorAddrs[MAX_DEVICES];      // track by BLE address (more reliable than name)
-float  anchorEMA[MAX_DEVICES];        // smoothed RSSI
-int    anchorSeenScans[MAX_DEVICES];  // how many scans (within the current window) it appeared in
+String anchorAddrs[MAX_DEVICES];
+float  anchorEMA[MAX_DEVICES];
+int    anchorSeenScans[MAX_DEVICES];
 int    anchorCount = 0;
 
 int scanCount = 0;
 
-// Find index by address; returns -1 if not found
 int findAnchorIndexByAddr(const String& addr) {
   for (int i = 0; i < anchorCount; i++) {
     if (anchorAddrs[i] == addr) return i;
@@ -64,17 +67,19 @@ void resetAnchorsWindow() {
   scanCount = 0;
 }
 
-/*
-  Do one BLE scan and gather ONE sample per anchor for this scan:
-  - If an anchor appears multiple times in the scan results, keep only the strongest RSSI sample.
-*/
+void sendAnchorMessage(const String& msg) {
+  digitalWrite(UART_INT_PIN, HIGH);
+  delay(1);
+  AnchorUart.println(msg);
+  delay(UART_INT_PULSE_MS);
+  digitalWrite(UART_INT_PIN, LOW);
+}
+
 void doOneScanAccumulate() {
   Serial.println("Scanning...");
 
-  // Blocking scan; it auto-stops after SCAN_TIME_SECONDS
   BLEScanResults* results = pBLEScan->start(SCAN_TIME_SECONDS, false);
 
-  // Per-scan de-dupe buffers (strongest RSSI per anchor during this scan)
   String scanAddrs[MAX_DEVICES];
   String scanNames[MAX_DEVICES];
   int    scanBestRSSI[MAX_DEVICES];
@@ -90,21 +95,21 @@ void doOneScanAccumulate() {
     String name = dev.getName().c_str();
     if (!name.startsWith("Anchor")) continue;
 
-    // Use address as the unique key (best practice)
     String addr = dev.getAddress().toString().c_str();
     int rssi = dev.getRSSI();
 
-    // Find in per-scan unique list
     int scanIdx = -1;
     for (int j = 0; j < scanUniqueCount; j++) {
-      if (scanAddrs[j] == addr) { scanIdx = j; break; }
+      if (scanAddrs[j] == addr) {
+        scanIdx = j;
+        break;
+      }
     }
 
     if (scanIdx >= 0) {
-      // Keep the strongest RSSI sample this scan
       if (rssi > scanBestRSSI[scanIdx]) {
         scanBestRSSI[scanIdx] = rssi;
-        scanNames[scanIdx] = name; // update name if it changes
+        scanNames[scanIdx] = name;
       }
     } else if (scanUniqueCount < MAX_DEVICES) {
       scanAddrs[scanUniqueCount] = addr;
@@ -114,7 +119,6 @@ void doOneScanAccumulate() {
     }
   }
 
-  // Apply this scan’s samples to the window trackers (EMA)
   for (int k = 0; k < scanUniqueCount; k++) {
     const String& addr = scanAddrs[k];
     const String& name = scanNames[k];
@@ -122,15 +126,13 @@ void doOneScanAccumulate() {
 
     int idx = findAnchorIndexByAddr(addr);
     if (idx >= 0) {
-      // EMA update
       anchorEMA[idx] = EMA_ALPHA * sample + (1.0f - EMA_ALPHA) * anchorEMA[idx];
       anchorSeenScans[idx] += 1;
-      // keep latest name
       anchorNames[idx] = name;
     } else if (anchorCount < MAX_DEVICES) {
       anchorAddrs[anchorCount] = addr;
       anchorNames[anchorCount] = name;
-      anchorEMA[anchorCount] = sample;        // initialize EMA with first sample
+      anchorEMA[anchorCount] = sample;
       anchorSeenScans[anchorCount] = 1;
       anchorCount++;
     }
@@ -140,16 +142,10 @@ void doOneScanAccumulate() {
   pBLEScan->clearResults();
 }
 
-/*
-  Pick best anchor by highest EMA RSSI (closest-ish),
-  requiring it was seen in at least MIN_REQUIRED_SEEN scans in this window.
-  - Serial: debug
-  - AnchorUart: ONLY name (or NONE)
-*/
 void reportClosest() {
   if (anchorCount == 0) {
     Serial.println("NONE");
-    AnchorUart.println("NONE");
+    sendAnchorMessage("NONE");
     return;
   }
 
@@ -174,23 +170,22 @@ void reportClosest() {
 
   if (bestIdx < 0) {
     Serial.println("NONE");
-    AnchorUart.println("NONE");
+    sendAnchorMessage("NONE");
     return;
   }
 
-  // Keep your current monitor behavior (prints the winner)
   Serial.println(anchorNames[bestIdx]);
-
-  // Separate UART: name only
-  AnchorUart.println(anchorNames[bestIdx]);
+  sendAnchorMessage(anchorNames[bestIdx]);
 }
 
 void setup() {
   Serial.begin(115200);
   delay(200);
 
-  // Secondary UART for name-only output
   AnchorUart.begin(ANCHOR_UART_BAUD, SERIAL_8N1, ANCHOR_UART_RX, ANCHOR_UART_TX);
+
+  pinMode(UART_INT_PIN, OUTPUT);
+  digitalWrite(UART_INT_PIN, LOW);
 
   Serial.println("Initializing BLE scan...");
 
@@ -198,9 +193,6 @@ void setup() {
   pBLEScan = BLEDevice::getScan();
 
   pBLEScan->setActiveScan(USE_ACTIVE_SCAN);
-
-  // Tuning: window <= interval. Bigger values scan more, but cost power/CPU.
-  // These are reasonable defaults.
   pBLEScan->setInterval(80);
   pBLEScan->setWindow(60);
 

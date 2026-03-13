@@ -7,7 +7,6 @@
 #include "driver/gpio.h"
 #include "esp_log.h"
 #include "esp_check.h"
-
 #include "mfrc522.h"
 
 // MFRC522 registers

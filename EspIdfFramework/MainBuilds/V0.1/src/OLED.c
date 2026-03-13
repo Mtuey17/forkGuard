@@ -13,6 +13,9 @@ c file for BNO055 IMU
 #include "freertos/task.h"
 #include "esp_log.h"
 #include <math.h>
+#include "esp_timer.h"
+#include "liftDynamics.h"
+#include <string.h>
 
 
 
@@ -38,7 +41,9 @@ return dev_hdl;
 
 
 /*
+OLD method, too slow to draw 
 void drawWeightChart(ssd1306_handle_t OLED,float currentWeight,float maxCurrentWeight){
+
 
     //ssd1306_clear_display(OLED, false);
 
@@ -66,9 +71,7 @@ void drawWeightChart(ssd1306_handle_t OLED,float currentWeight,float maxCurrentW
 }
     */
 
-   void drawWeightChart(ssd1306_handle_t OLED,
-                     float currentWeight,
-                     float maxCurrentWeight)
+   void drawWeightChart(ssd1306_handle_t OLED,float currentWeight,float maxCurrentWeight)
 {
     const float matFlatWeight = 0.49f;
     const uint8_t maxHeight = 32;
@@ -81,26 +84,25 @@ void drawWeightChart(ssd1306_handle_t OLED,float currentWeight,float maxCurrentW
 
     uint8_t rampWidth = (uint8_t)(maxWidth * pct);
 
-    // Clear buffer (FAST)
+
     memset(OLED->page, 0, sizeof(OLED->page));
 
-    // Vertical markers
+    
     ssd1306_set_line(OLED, (int)maxWidth, 0, (int)maxWidth, 31, false);
     ssd1306_set_line(OLED, (int)safeX,   0, (int)safeX,   31, false);
 
-    // ---- RAMP FILL ----
+
     for (uint8_t x = 0; x < rampWidth; x++)
     {
-        // Height increases linearly toward maxWidth
+    
         float h = ((float)x / maxWidth) * maxHeight;
 
-        // Clamp ramp height by current percentage
         uint8_t height = (uint8_t)(h * pct);
         if (height == 0) continue;
 
         uint8_t yTop = maxHeight - height;
 
-        // Draw a vertical filled slice
+
         ssd1306_set_line(OLED, x, yTop, x, maxHeight - 1, false);
     }
 
@@ -108,85 +110,132 @@ void drawWeightChart(ssd1306_handle_t OLED,float currentWeight,float maxCurrentW
 }
 
 
+void drawBalanceChart(ssd1306_handle_t OLED, float imbalancePercent)
+{
+    const int squareSize = 16;
+    const float precentage=100.0f;
+
+    const int centerX = 128 / 2;
+    const int centerY = 32 / 2;
+
+    const int maxOffset = (128 / 2) - (squareSize / 2) - 2;
+    const int leftLimit  = centerX - maxOffset;
+    const int rightLimit = centerX + maxOffset;
+
+    if (imbalancePercent > precentage) imbalancePercent = precentage;
+    if (imbalancePercent < -precentage) imbalancePercent = -precentage;
+
+    float norm = -imbalancePercent / precentage;
+
+    int squareX = centerX - (squareSize / 2) + (int)(norm * maxOffset);
+    int squareY = centerY - (squareSize / 2);
+
+    memset(OLED->page, 0, sizeof(OLED->page));
+
+    ssd1306_set_line(OLED, centerX, 0, centerX, 32 - 1, false);
+    ssd1306_set_line(OLED, leftLimit, centerY - 8, leftLimit, centerY + 8, false);
+    ssd1306_set_line(OLED, rightLimit, centerY - 8, rightLimit, centerY + 8, false);
+
+    for (int x = squareX; x < squareX + squareSize; x++)
+    {
+        ssd1306_set_line(OLED, x, squareY, x, squareY + squareSize - 1, false);
+    }
+
+    ssd1306_display_pages(OLED);
+}
+
+bool showDriver(ssd1306_handle_t OLED,uint32_t *lastUpdate,const char*driverNames[],ForkLift*FL)
+{
+    
+    
+    const float refreshRateHz=5.0;
+    bool driverSelected=true;
+    const char *currentDriver=driverNames[FL->currentDriver[0]];
+
+    if (currentDriver!=NULL){
+    if (strcmp(currentDriver, "None") == 0) {driverSelected = false;}
+    };
+    
+    uint32_t periodMs=(1.0f/refreshRateHz)*1000.0f;
+    uint32_t currentTime=esp_timer_get_time()/1000;
+    if ((currentTime-*lastUpdate)>=periodMs){
+        *lastUpdate=currentTime;  
+        ssd1306_display_text_x2(OLED,0,"Driver:",false);
+        if (currentDriver==NULL){currentDriver="Unknown";}
+        char toDisplay[128];
+        snprintf(toDisplay, sizeof(toDisplay), "%s",currentDriver);
+        ssd1306_display_text_x2(OLED,2,toDisplay,false);
+        
+    }
+        
+    return driverSelected;
 
 
 
-//custom bitmaps 
-const uint8_t exclaim_bitmap8x16[] = {
-  0x00, // 00000000
-  0x18, // 00011000
-  0x18, // 00011000
-  0x18, // 00011000
-  0x18, // 00011000
-  0x18, // 00011000
-  0x18, // 00011000
-  0x18, // 00011000
-  0x18, // 00011000
-  0x18, // 00011000
-  0x18, // 00011000
-  0x00, // 00000000 (gap)
-  0x00, // 00000000
-  0x00, // 00000000
-  0x18, 
-  0x00  
-};
+
+}
+void showWeightInfo(ssd1306_handle_t OLED, uint32_t *lastUpdate,ForkLift* FL){
+    const float refreshRateHz=5.0;
+    uint32_t periodMs=(1.0f/refreshRateHz)*1000.0f;
+    uint32_t currentTime=esp_timer_get_time()/1000;
+    if ((currentTime-*lastUpdate)>=periodMs){//only refreshing screen at rate of 'refreshRateHz'
+        *lastUpdate=currentTime;
+        char toDisplay[128];
+
+        //ssd1306_clear_display(OLED,false);
+
+        //ssd1306_display_text_x2(OLED,0,"Load",false);
 
 
-const uint8_t whiteLine_icon_32x32[] = { 
-    0xFF, 
-    0xFF, 
-    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, };
+        snprintf(toDisplay, sizeof(toDisplay), "ML:%0.3f",FL->maxDynamicLoad);
+        ssd1306_display_text_x2(OLED,0,toDisplay,false);
+        snprintf(toDisplay, sizeof(toDisplay), "CL:%0.3f",FL->currentLoad);
+        ssd1306_display_text_x2(OLED,2,toDisplay,false);
 
 
-const uint8_t emptyLine_icon_32x32[] = {
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
+        /*
+        snprintf(toDisplay, sizeof(toDisplay), "Driver: %s",currentDriver);
+        ssd1306_display_text(OLED,0,toDisplay,false);
+        snprintf(toDisplay, sizeof(toDisplay), "Max Load: %0.3f",FL->maxDynamicLoad);
+        ssd1306_display_text(OLED,1,toDisplay,false);
+        snprintf(toDisplay, sizeof(toDisplay), "C-Load: %0.3f",FL->currentLoad);
+        ssd1306_display_text(OLED,2,toDisplay,false);
+        snprintf(toDisplay, sizeof(toDisplay), "M-Brake: %0.1fm/s",FL->maxAcceleration);
+        ssd1306_display_text(OLED,3,toDisplay,false);
+        snprintf(toDisplay, sizeof(toDisplay), "M-Brake: %0.1fm/s",FL->maxAcceleration);
+        ssd1306_display_text(OLED,4,toDisplay,false);
+        */
+
+
+
+    }
+
+
+
+
+
+}
+
+const uint8_t forklift_guard_icon_64x32[] = {
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xE0, 0xF8, 0x08, 0x08, 0x08,
+    0x88, 0x88, 0x88, 0x08, 0x08, 0x08, 0x18, 0x30, 0xE0, 0x80, 0x00, 0x00, 0x07, 0xFF, 0xFE, 0x80,
+    0x00, 0x00, 0x00, 0x70, 0xFE, 0xFF, 0xF8, 0xF8, 0xF8, 0xF8, 0xFC, 0xFC, 0xFE, 0xFE, 0xFF, 0xFF,
+    0xFE, 0xFE, 0xFC, 0xFC, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0xF0, 0x00, 0x00, 0x00, 0x00, 0x00,
+
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0xFF, 0x03, 0xE0, 0xC0, 0xF0,
+    0xFB, 0xFB, 0xF3, 0x60, 0x60, 0x60, 0x20, 0x70, 0xC1, 0x8F, 0xFC, 0xE0, 0x00, 0x0F, 0xFF, 0xFF,
+    0x80, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x0F, 0x00, 0x00, 0x00, 0x00, 0x00,
+
+    0x00, 0x00, 0x00, 0x00, 0x00, 0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE, 0xF0, 0x80, 0xC1, 0xE7, 0xFF, 0xFF, 0xFF, 0xF8, 0xFF, 0xFF,
+    0x1F, 0x00, 0x00, 0x1C, 0x3F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F,
+    0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x3C, 0x00, 0x00, 0x00, 0x00, 0x00,
+
+    0x00, 0x00, 0xF0, 0xF8, 0xFC, 0xFF, 0x07, 0x07, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03,
+    0x03, 0x03, 0x83, 0xE7, 0xFF, 0x3F, 0x1E, 0x0F, 0x03, 0x01, 0x01, 0x07, 0x1F, 0x7F, 0xFE, 0xF8,
+    0xF8, 0xF8, 0xFC, 0xFE, 0xFF, 0xFF, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03,
+    0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x07, 0xFF, 0xFE, 0xF8, 0xE0, 0x00, 0x00, 0x00
 };
 
 

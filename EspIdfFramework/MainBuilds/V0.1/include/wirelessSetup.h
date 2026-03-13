@@ -1,5 +1,6 @@
 #include "mqtt_client.h"
 #include "liftDynamics.h"
+#include "RTLS.h"
 #ifndef WIRELESSSETUP_H
 #define WIRELESSSETUP_H
 
@@ -18,7 +19,7 @@ typedef struct {
 } MQTTHandler;
 void initWifi(char*,char*);
 MQTTHandler* initMQTT();
-bool sendMQTT(MQTTHandler*,ForkLift*);
+bool sendMQTT(MQTTHandler*,ForkLift*,RTLS_Instance*);
 
 
 

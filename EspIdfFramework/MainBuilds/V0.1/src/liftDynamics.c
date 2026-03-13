@@ -12,10 +12,10 @@ matthewjtuer@gmail.com
 ForkLift* initializeLift(){
     ForkLift *lift_instance = malloc(sizeof(ForkLift));
     lift_instance->wheelBase=14.5;
-    lift_instance->weightKG=1.360; //=0.766;
-    lift_instance->cOfG=9.5;
-    lift_instance->cOfGHeight=5.95;
-    lift_instance->FwToLoad=10;
+    lift_instance->weightKG=1.695; //=0.766;
+    lift_instance->cOfG=9.0;
+    lift_instance->cOfGHeight=8.15; //56 deg 
+    lift_instance->FwToLoad=10;  
     lift_instance->maxDynamicLoad=0;
     lift_instance->maxAcceleration=0;
     lift_instance->safetyFactor=.8f;
@@ -25,6 +25,9 @@ ForkLift* initializeLift(){
     lift_instance-> currentAccel=0;
     lift_instance-> gas=0;
     lift_instance-> noise=0;
+    lift_instance->loadBalance=0.0f;
+    lift_instance->highestWeightToday=0.0f;
+    lift_instance-> hardestBraketoday=0.0f;
     memset(lift_instance->currentDriver, 0, sizeof(lift_instance->currentDriver));
     memset(lift_instance->previousDriver, 0, sizeof(lift_instance->previousDriver));
 

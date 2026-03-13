@@ -7,6 +7,8 @@
 #include "liftDynamics.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
+#include "RTLS.h"
+#include "esp_timer.h"
 void initWifi(char *SSID,char *Password){
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -52,7 +54,7 @@ return MQTT_INSTANCE;
 
 }
 
-bool sendMQTT(MQTTHandler* MQTT_INSTANCE,ForkLift* LiftValues){
+bool sendMQTT(MQTTHandler* MQTT_INSTANCE,ForkLift* LiftValues,RTLS_Instance* RT){
     float safeMargine=LiftValues->safetyFactor;
 
 
@@ -60,6 +62,8 @@ bool sendMQTT(MQTTHandler* MQTT_INSTANCE,ForkLift* LiftValues){
     //--------------Handling brake warning and error messages--------------
     //approaching max 
     bool allowWeightWarning=true;
+
+    /*
     //case when driver is operating within safety margine 
     if (((LiftValues->currentAccel/LiftValues->maxAcceleration)>safeMargine)&&!MQTT_INSTANCE->brakeLatch){
     MQTT_INSTANCE->brakeLatch=true;
@@ -71,7 +75,23 @@ bool sendMQTT(MQTTHandler* MQTT_INSTANCE,ForkLift* LiftValues){
       if ((LiftValues->currentAccel/LiftValues->maxAcceleration)<safeMargine){
     MQTT_INSTANCE->brakeLatch=false;
     }
+    */
+
+    if (LiftValues->currentAccel<-4.5f&&!MQTT_INSTANCE->brakeLatch){
+        char msg[128];
+        snprintf(msg, sizeof(msg), "hard brake!");
+        gpio_set_level(GPIO_NUM_45,1);
+        esp_mqtt_client_publish(MQTT_INSTANCE->handler, "toyLift1/brakeWarning", msg, 0, 2, 0);
+        MQTT_INSTANCE->brakeLatch=true;
+    }
+    else{}
+    if (LiftValues->currentAccel>-4.4f){ gpio_set_level(GPIO_NUM_45,0); MQTT_INSTANCE->brakeLatch=false;}
+
+
+
+
     //exceding max 
+    /*
     if (LiftValues->currentAccel>LiftValues->maxAcceleration&&!MQTT_INSTANCE->brakeErrorLatch){
         MQTT_INSTANCE->brakeErrorLatch=true;
         char msg[128];
@@ -82,6 +102,7 @@ bool sendMQTT(MQTTHandler* MQTT_INSTANCE,ForkLift* LiftValues){
      if (LiftValues->currentAccel<LiftValues->maxAcceleration){
         MQTT_INSTANCE->brakeErrorLatch=false;
      }
+        */
      //-----------------------------------------------------------
 
 
@@ -143,8 +164,12 @@ bool sendMQTT(MQTTHandler* MQTT_INSTANCE,ForkLift* LiftValues){
     //--------------------------------------------------------------------
 
 
-
-
+    /*
+    char msg[128];
+        snprintf(msg, sizeof(msg), "%02X%02X%02X%02X",LiftValues->currentDriver[0],LiftValues->currentDriver[1],LiftValues->currentDriver[2],LiftValues->currentDriver[3]);
+        esp_mqtt_client_publish(MQTT_INSTANCE->handler, "toyLift1/driver", msg, 0, 2, 0);
+    */
+    
     //-------------------UUID message-------------------------------------
     if (memcmp(LiftValues->currentDriver,LiftValues->previousDriver,sizeof(LiftValues->currentDriver)) != 0){
 
@@ -154,6 +179,17 @@ bool sendMQTT(MQTTHandler* MQTT_INSTANCE,ForkLift* LiftValues){
         esp_mqtt_client_publish(MQTT_INSTANCE->handler, "toyLift1/driver", msg, 0, 2, 0);
     }
     //----------------------------------------------------------------
+    
+    uint16_t rateMs=(1/RT->sendRateHz)*1000;
+    uint32_t currentTime=esp_timer_get_time()/1000;
+    if ((currentTime-RT->lastSendTime)>=rateMs)
+    {
+        RT->lastSendTime=currentTime;
+        char msg[128];
+        snprintf(msg, sizeof(msg), "%d",RT->anchorId);
+        RT->previousId=RT->anchorId;
+        esp_mqtt_client_publish(MQTT_INSTANCE->handler, "toyLift1/Location", msg, 0, 2, 0);
+    }
     
 
 

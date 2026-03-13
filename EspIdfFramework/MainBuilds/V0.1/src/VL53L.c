@@ -33,23 +33,20 @@ VL53L_t *initializeTOF(i2c_master_bus_handle_t bus_handle, uint8_t id) {
 
     vTaskDelay(pdMS_TO_TICKS(1500));
 
-    //vl53l0x_set_address(VL53L_instance,0x28);
+    //vl53l0x_set_address(VL53L_instance,0x28);//to change adress (does not work)
     //VL53L_instance->deviceID = 0x28;
 
-    // 2. Check sensor ID (optional but useful for debugging)
+
     uint8_t reg = 0xC0;
     uint8_t id_value = 0;
     i2c_master_transmit_receive(VL53L_instance->dev_handle, &reg, 1, &id_value, 1, -1);
-    ESP_LOGI(TAG, "VL53L0X ID: 0x%02X", id_value);
+    ESP_LOGI(TAG, "VL53L0X ID: 0x%02X", id_value);//logging id (mainly for debug purpouses)
     VL53L_instance->validID=id_value;
 
 
-    //vl53l0x_set_address(VL53L_instance,0x28);
-    //VL53L_instance->deviceID=0x28;
-    //vTaskDelay(pdMS_TO_TICKS(150));
 
-    i2c_master_transmit(VL53L_instance->dev_handle, (uint8_t[]){0x00, 0x02}, 2, pdMS_TO_TICKS(50)); // 0x02 = continuous mode
-    i2c_master_transmit(VL53L_instance->dev_handle, (uint8_t[]){0x04, 0x14}, 2, pdMS_TO_TICKS(50)); //setting time interval to 20ms (0x14)
+    i2c_master_transmit(VL53L_instance->dev_handle, (uint8_t[]){0x00, 0x02}, 2, pdMS_TO_TICKS(50)); // 0x02 continuous polling
+    i2c_master_transmit(VL53L_instance->dev_handle, (uint8_t[]){0x04, 0x14}, 2, pdMS_TO_TICKS(50)); //set time interval to 20ms
     vTaskDelay(pdMS_TO_TICKS(50));
     return VL53L_instance;
     }
@@ -57,8 +54,8 @@ VL53L_t *initializeTOF(i2c_master_bus_handle_t bus_handle, uint8_t id) {
 bool updateDistance(VL53L_t *TOF) {
 
     uint8_t response[2] = {0};
-    // Poll distance directly; continuous mode always updates
-    if (i2c_master_transmit_receive(TOF->dev_handle, (uint8_t[]){0x1E}, 1, response, 2, -1) != ESP_OK) {
+
+    if (i2c_master_transmit_receive(TOF->dev_handle, (uint8_t[]){0x1E}, 1, response, 2, -1) != ESP_OK) {//0x1E-result reg
         ESP_LOGW(TAG, "I2C timeout reading distance");
         return false;
     }
@@ -67,20 +64,18 @@ bool updateDistance(VL53L_t *TOF) {
     return true;
 }
 
-bool vl53l0x_set_address(VL53L_t *TOF, uint8_t new_address) {
+bool vl53l0x_set_address(VL53L_t *TOF, uint8_t new_address) {//does not work
     if (!TOF) return false;
 
-    // VL53L0X I2C address register
-    uint8_t reg = 0x8A;
-    uint8_t value = new_address & 0x7F;  // ensure 7-bit address
+    uint8_t reg = 0x8A;//address register 
+    uint8_t value = new_address & 0x7F;  
 
-    // Write new address
+    // write new address
     if (i2c_master_transmit(TOF->dev_handle, (uint8_t[]){reg, value}, 2, pdMS_TO_TICKS(50)) != ESP_OK) {
         ESP_LOGW("VL53L0X", "Failed to write new I2C address");
         return false;
     }
 
-    // Update the struct with new address
     TOF->deviceID = new_address;
     ESP_LOGI("VL53L0X", "I2C address changed to 0x%02X", new_address);
 

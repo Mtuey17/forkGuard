@@ -11,7 +11,7 @@ ICS43434* InitICS(i2s_chan_handle_t i2s_handler){
     ICS_Instance->handle=i2s_handler;
     ICS_Instance->frameSamples=1024;
     ICS_Instance-> warningSustainedDB=85.0f;
-    ICS_Instance-> warningInstantDB=100.0f;
+    ICS_Instance-> warningInstantDB=95.0f;
     ICS_Instance-> sustainedSeconds=3.0f; 
     ICS_Instance-> offset=123.0103f;
     //ICS_Instance-> buffer[ICS_Instance->frameSamples*2];
