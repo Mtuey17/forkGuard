@@ -3,6 +3,10 @@ november  16th, 2025
 mtuer3727@conestogac.on.ca
 matthewjtuer@gmail.com 
 
+
+approx 1500 lines of code!!! (all .c files)
+
+
 need to add interupt pin from RTLS
 when RTLS sends data, it will drive a pin high
 this pin will invoke an interupt where a RTLS_READY flag will be set 
@@ -64,6 +68,31 @@ static void IRAM_ATTR rtls_isr_handler(void *arg)
 RTLS_READY = true;
 }
 
+void updateLedSequence4(uint32_t *lastStepTime, uint8_t *ledState)
+{
+    const uint32_t stepPeriodMs = 150;
+    uint32_t currentTime = esp_timer_get_time() / 1000;
+
+    if ((currentTime - *lastStepTime) >= stepPeriodMs) {
+        *lastStepTime = currentTime;
+
+        // Turn all OFF
+        gpio_set_level(GPIO_NUM_48, 0); // LED1
+        gpio_set_level(GPIO_NUM_45, 0); // LED2
+        gpio_set_level(GPIO_NUM_47, 0); // LED3
+        gpio_set_level(GPIO_NUM_21, 0); // LED4
+
+        // Turn ON one LED
+        switch (*ledState) {
+            case 0: gpio_set_level(GPIO_NUM_48, 1); break;
+            case 1: gpio_set_level(GPIO_NUM_45, 1); break;
+            case 2: gpio_set_level(GPIO_NUM_47, 1); break;
+            case 3: gpio_set_level(GPIO_NUM_21, 1); break;
+        }
+
+        *ledState = (*ledState + 1) % 4;
+    }
+}
 
 void app_main() {
 
@@ -187,9 +216,12 @@ void app_main() {
 
     //---------------------MISC INIT---------------------
 
-    //ssd1306_display_bitmap(OLED, 32, 0, forklift_guard_icon_64x32, 64, 32, false);
-
-
+    ssd1306_display_bitmap(OLED,0,0,forklift_guard_icon_128x32,128,64,false);
+    uint32_t startLogoTime=esp_timer_get_time()/1000;
+    bool clearLatch=false;
+    uint32_t lastLedStepTime = 0;
+    uint8_t ledState = 0;
+ 
     while(1){
      
 
@@ -224,6 +256,7 @@ void app_main() {
         //---------------DATA MANIPULATION---------------
         toyLift->currentAccel=IMU->rawYAcceleration;
         if (toyLift->currentAccel<toyLift->hardestBraketoday){toyLift->hardestBraketoday=toyLift->currentAccel;}//seeing if this is max for today (for UI)
+        toyLift->previousLoad=toyLift->currentLoad;
         toyLift->currentLoad=(leftForkSensor->kgWeight+rightForkSensor->kgWeight);
         if (toyLift->currentLoad>toyLift->highestWeightToday){toyLift->highestWeightToday=toyLift->currentLoad;}//seeing if this is max for today (for UI)
 
@@ -252,9 +285,11 @@ void app_main() {
         gpio_set_level(NOISE_WARNING_LED,toyLift->noise);
         gpio_set_level(GAS_WARNING_LED,!toyLift->gas);
       
-  
         
+
          //when driver changes,make ui show driver page
+         if ((esp_timer_get_time()/1000)-startLogoTime>3000){
+         if (!clearLatch){ssd1306_clear_display(OLED,false);clearLatch=true;}
          if (memcmp(toyLift->currentDriver,toyLift->previousDriver,sizeof(toyLift->currentDriver)) != 0){UI_State=2;}
          if (clearDisplay){ssd1306_clear_display(OLED,false);clearDisplay=false;}
         switch ((UI_State))
@@ -274,21 +309,37 @@ void app_main() {
             drawBalanceChart(OLED,toyLift->loadBalance);
             break;
         }
+
+    sendMQTT(MQTT,toyLift,RTLS);
+    }else{updateLedSequence4(&lastLedStepTime, &ledState);}
+            
+    
+            
         
-        sendMQTT(MQTT,toyLift,RTLS);
+        
 
         uint32_t mainLoopEndTime=esp_timer_get_time()/1000;
         uint16_t computeTime=mainLoopEndTime-mainLoopStartTime;
         //ESP_LOGI("main",":%d",RTLS->anchorId);
      
 
+        
 
         //ESP_LOGI("main","left RAW: %ld KG: %f || right RAW:  %ld  KG: %f",leftForkSensor->Weight,leftForkSensor->kgWeight,rightForkSensor->Weight,rightForkSensor->kgWeight);
         //ESP_LOGI("main","noseDB: %f | HT: %d | CHT: %d",microphone->dbLevel,microphone->dbHigh,microphone->dbHighSustained);
         //ESP_LOGI("main","maxAccel: %f | currentAccel: %f",toyLift->maxAcceleration,toyLift->currentAccel);
         ESP_LOGI("main","pitch: %d | maxLoad: %f kg| currentLoad: %f kg| height: %dcm|GAS:%d|UID:%02X%02X%02X%02X|location:%d|ct:%d",IMU->pitch,toyLift->maxDynamicLoad,toyLift->currentLoad,TOF->distance,toyLift->gas,toyLift->currentDriver[0], toyLift->currentDriver[1], toyLift->currentDriver[2], toyLift->currentDriver[3],RTLS->anchorId,computeTime);
-        //------------OUTPUTS AND NETWORKING-------------
 
+
+       
+       /*
+        if (toyLift->currentLoad>0.9f){
+             break;
+        }*/
+        //------------OUTPUTS AND NETWORKING-------------
+        //2.669600 
+        //2.653740
+        //2.648900
 
         vTaskDelay(pdMS_TO_TICKS(40));
     }

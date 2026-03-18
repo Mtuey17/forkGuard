@@ -9,6 +9,7 @@
 #include "esp_log.h"
 #include "RTLS.h"
 #include "esp_timer.h"
+#include <math.h>
 void initWifi(char *SSID,char *Password){
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -63,19 +64,7 @@ bool sendMQTT(MQTTHandler* MQTT_INSTANCE,ForkLift* LiftValues,RTLS_Instance* RT)
     //approaching max 
     bool allowWeightWarning=true;
 
-    /*
-    //case when driver is operating within safety margine 
-    if (((LiftValues->currentAccel/LiftValues->maxAcceleration)>safeMargine)&&!MQTT_INSTANCE->brakeLatch){
-    MQTT_INSTANCE->brakeLatch=true;
-    char msg[128];
-        allowWeightWarning=false;
-        snprintf(msg, sizeof(msg), "approaching brake max!");
-        esp_mqtt_client_publish(MQTT_INSTANCE->handler, "toyLift1/brakeWarning", msg, 0, 2, 0);
-    }
-      if ((LiftValues->currentAccel/LiftValues->maxAcceleration)<safeMargine){
-    MQTT_INSTANCE->brakeLatch=false;
-    }
-    */
+
 
     if (LiftValues->currentAccel<-4.5f&&!MQTT_INSTANCE->brakeLatch){
         char msg[128];
@@ -89,28 +78,13 @@ bool sendMQTT(MQTTHandler* MQTT_INSTANCE,ForkLift* LiftValues,RTLS_Instance* RT)
 
 
 
-
-    //exceding max 
-    /*
-    if (LiftValues->currentAccel>LiftValues->maxAcceleration&&!MQTT_INSTANCE->brakeErrorLatch){
-        MQTT_INSTANCE->brakeErrorLatch=true;
-        char msg[128];
-
-        snprintf(msg, sizeof(msg), "Excedded brake max!");
-        esp_mqtt_client_publish(MQTT_INSTANCE->handler, "toyLift1/brakeError", msg, 0, 2, 0);
-    }
-     if (LiftValues->currentAccel<LiftValues->maxAcceleration){
-        MQTT_INSTANCE->brakeErrorLatch=false;
-     }
-        */
-     //-----------------------------------------------------------
-
-
-
     //--------------Handling weight warning and error messages--------------
     //when accelerating/deaccelerating hard weight reading may be incorrect. only allowed to send weight warning when not under steep accel
     //case when driver is operating within safety margine
     //apporaching max
+
+
+    if (fabs(LiftValues->currentLoad-2.6f)>150.0f){
     if (((LiftValues->currentLoad/LiftValues->maxDynamicLoad)>safeMargine)&&!MQTT_INSTANCE->weightLatch&&allowWeightWarning){
     MQTT_INSTANCE->weightLatch=true;
     char msg[128];
@@ -125,16 +99,18 @@ bool sendMQTT(MQTTHandler* MQTT_INSTANCE,ForkLift* LiftValues,RTLS_Instance* RT)
     gpio_set_level(GPIO_NUM_48,0);
     }
     //exceeding max 
+    if (LiftValues->currentLoad>=LiftValues->maxDynamicLoad){
     if (LiftValues->currentLoad>=LiftValues->maxDynamicLoad&&!MQTT_INSTANCE->weightErrorLatch){
         MQTT_INSTANCE->weightErrorLatch=true;
         char msg[128];
 
         snprintf(msg, sizeof(msg), "Excedded_Weight_Max");
         esp_mqtt_client_publish(MQTT_INSTANCE->handler, "toyLift1/weightError", msg, 0, 2, 0);
-    }
+    }}
      if (LiftValues->currentLoad<LiftValues->maxDynamicLoad){
         MQTT_INSTANCE->weightErrorLatch=false;
      }
+    }
      //-----------------------------------------------------------------------
 
 
@@ -151,7 +127,7 @@ bool sendMQTT(MQTTHandler* MQTT_INSTANCE,ForkLift* LiftValues,RTLS_Instance* RT)
     }
     //--------------------------------------------------------------------
 
-    //----------------------gas message-----------------------------------
+    //----------------------noise message-----------------------------------
     if (LiftValues->noise&& !MQTT_INSTANCE->noiseLatch){
         MQTT_INSTANCE->noiseLatch=true;
         char msg[128];
@@ -164,11 +140,7 @@ bool sendMQTT(MQTTHandler* MQTT_INSTANCE,ForkLift* LiftValues,RTLS_Instance* RT)
     //--------------------------------------------------------------------
 
 
-    /*
-    char msg[128];
-        snprintf(msg, sizeof(msg), "%02X%02X%02X%02X",LiftValues->currentDriver[0],LiftValues->currentDriver[1],LiftValues->currentDriver[2],LiftValues->currentDriver[3]);
-        esp_mqtt_client_publish(MQTT_INSTANCE->handler, "toyLift1/driver", msg, 0, 2, 0);
-    */
+  
     
     //-------------------UUID message-------------------------------------
     if (memcmp(LiftValues->currentDriver,LiftValues->previousDriver,sizeof(LiftValues->currentDriver)) != 0){

@@ -22,6 +22,7 @@ ForkLift* initializeLift(){
     lift_instance->loadScore=100.0f;
     lift_instance->brakeScore=100.0f;
     lift_instance-> currentLoad=0;
+    lift_instance-> previousLoad=0;
     lift_instance-> currentAccel=0;
     lift_instance-> gas=0;
     lift_instance-> noise=0;

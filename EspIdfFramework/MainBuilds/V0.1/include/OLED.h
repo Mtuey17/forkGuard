@@ -23,6 +23,6 @@ bool showDriver(ssd1306_handle_t,uint32_t*,const char*[],ForkLift*);
 
 
 
-extern const uint8_t forklift_guard_icon_64x32[];
+extern const uint8_t forklift_guard_icon_128x32[];
 
 #endif 

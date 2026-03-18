@@ -33,6 +33,7 @@ typedef struct {
     float loadBalance;
     float highestWeightToday;
     float hardestBraketoday;
+    float previousLoad;
 
     uint8_t currentDriver[4];
     uint8_t previousDriver[4];
